@@ -43,6 +43,11 @@ impl WinProcList {
     }
 
     pub fn update(&mut self) -> Result<(), WinProcListError> {
+        // if self.proc_list is set already, free the memory
+        if self.base_address != std::ptr::null_mut() {
+            self.free_mem(self.base_address);
+        }
+
         let addr = self.get_system_processes_info(0x10000);
 
         if addr == std::ptr::null_mut() {
@@ -151,13 +156,18 @@ impl WinProcList {
 
         str
     }
+
+    fn free_mem(&self, addr: *mut c_void) {
+        if addr != std::ptr::null_mut() {
+            unsafe {
+                VirtualFree(addr, 0, MEM_RELEASE);
+            }
+        }
+    }
 }
 
 impl Drop for WinProcList {
     fn drop(&mut self) {
-        println!("Dropping WinProcList");
-        unsafe {
-            VirtualFree(self.base_address, 0, MEM_RELEASE);
-        }
+        self.free_mem(self.base_address);
     }
 }
