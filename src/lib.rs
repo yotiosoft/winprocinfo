@@ -56,6 +56,9 @@ impl WinProcList {
         // if self.proc_list is set already, free the memory
         if self.base_address != std::ptr::null_mut() {
             self.free_mem(self.base_address, self.alloc_size);
+            self.base_address = std::ptr::null_mut();
+            self.proc_list.clear();
+            self.alloc_size = 0;
         }
 
         let addr = self.get_system_processes_info(buffer_size)?;
