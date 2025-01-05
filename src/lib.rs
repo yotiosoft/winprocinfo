@@ -1,16 +1,24 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use winapi::ctypes::*;
 use winapi::um::memoryapi::*;
 use winapi::um::processthreadsapi::*;
 use winapi::um::winnt::{ MEM_COMMIT, MEM_RELEASE, PAGE_EXECUTE_READWRITE };
+use winapi::shared::ntdef::*;
 use ntapi::ntexapi::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum WinProcListError {
     CouldNotGetProcInfo,
+    BufferSizeTooSmall(usize, usize),
 }
-
-static MAX_TRIES : u32 = 5;
+impl Display for WinProcListError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            WinProcListError::CouldNotGetProcInfo => write!(f, "Could not get process information."),
+            WinProcListError::BufferSizeTooSmall(alloc_size, req_size) => write!(f, "Buffer size too small. You need at least {} bytes, but only allocated {} bytes.", req_size, alloc_size),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct ProcInfo {
@@ -32,6 +40,7 @@ pub struct ProcInfo {
 pub struct WinProcList {
     base_address: *mut c_void,
     pub proc_list: Vec<ProcInfo>,
+    pub alloc_size: usize,
 }
 
 impl WinProcList {
@@ -39,16 +48,18 @@ impl WinProcList {
         WinProcList {
             base_address: std::ptr::null_mut(),
             proc_list: Vec::new(),
+            alloc_size: 0,
         }
     }
 
-    pub fn update(&mut self) -> Result<(), WinProcListError> {
+    pub fn get(&mut self, buffer_size: usize) -> Result<(), WinProcListError> {
         // if self.proc_list is set already, free the memory
         if self.base_address != std::ptr::null_mut() {
-            self.free_mem(self.base_address);
+            self.free_mem(self.base_address, self.alloc_size);
         }
 
-        let addr = self.get_system_processes_info(0x10000);
+        let addr = self.get_system_processes_info(buffer_size)?;
+        self.alloc_size = buffer_size;
 
         if addr == std::ptr::null_mut() {
             return Err(WinProcListError::CouldNotGetProcInfo);
@@ -63,35 +74,35 @@ impl WinProcList {
 
     // 現在動作中のすべてのプロセス情報を取得
     // SystemProcessInformation を buffer に取得
-    fn get_system_processes_info(&self, mut buffer_size: u32) -> *mut c_void {
-        let mut tries = 0;
-        let mut base_address;
+    fn get_system_processes_info(&self, mut buffer_size: usize) -> Result<*mut c_void, WinProcListError> {
+        let before_buffer_size = buffer_size;
+        let base_address;
         unsafe {
-            loop {
-                base_address = VirtualAlloc(std::ptr::null_mut(), buffer_size as usize, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-
-                // プロセス情報を取得
-                // SystemProcessInformation : 各プロセスの情報（オプション定数）
-                // base_address             : 格納先
-                // buffer_size              : 格納先のサイズ
-                // &mut buffer_size         : 実際に取得したサイズ
-                let res = NtQuerySystemInformation(SystemProcessInformation, base_address, buffer_size, &mut buffer_size);
-
-                if res == 0 {
-                    break;
-                }
-                if tries == MAX_TRIES {
-                    break;
-                }
-
-                // realloc
-                VirtualFree(base_address, 0, MEM_RELEASE);
-
-                tries += 1;
-            }
-
-            return base_address;
+            base_address = VirtualAlloc(std::ptr::null_mut(), buffer_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
         }
+
+        // プロセス情報を取得
+        // SystemProcessInformation : 各プロセスの情報（オプション定数）
+        // base_address             : 格納先
+        // buffer_size              : 格納先のサイズ
+        // &mut buffer_size         : 実際に取得したサイズ
+        let mut buffer_size_u32 = buffer_size as u32;
+        let status;
+        unsafe {
+            status = NtQuerySystemInformation(SystemProcessInformation, base_address, buffer_size_u32, &mut buffer_size_u32);
+        }
+        if buffer_size_u32 != buffer_size as u32 {
+            buffer_size = buffer_size_u32 as usize;
+        }
+        if NT_ERROR(status) {
+            self.free_mem(base_address, before_buffer_size);
+            if before_buffer_size < buffer_size {
+                return Err(WinProcListError::BufferSizeTooSmall(before_buffer_size, buffer_size));
+            }
+            return Err(WinProcListError::CouldNotGetProcInfo);
+        }
+
+        return Ok(base_address);
     }
 
     fn get_proc_list(&self) -> Vec<ProcInfo> {
@@ -157,10 +168,10 @@ impl WinProcList {
         str
     }
 
-    fn free_mem(&self, addr: *mut c_void) {
+    fn free_mem(&self, addr: *mut c_void, buffer_size: usize) {
         if addr != std::ptr::null_mut() {
             unsafe {
-                VirtualFree(addr, 0, MEM_RELEASE);
+                VirtualFree(addr, buffer_size, MEM_RELEASE);
             }
         }
     }
@@ -168,6 +179,6 @@ impl WinProcList {
 
 impl Drop for WinProcList {
     fn drop(&mut self) {
-        self.free_mem(self.base_address);
+        self.free_mem(self.base_address, self.alloc_size);
     }
 }

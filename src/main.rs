@@ -1,8 +1,9 @@
 use winproclist;
 
-fn main() {
+fn main() -> Result<(), String> {
     let mut win_proc_list = winproclist::WinProcList::new();
-    win_proc_list.update().map_err(|e| println!("{:?}", e)).unwrap();
+    win_proc_list.get(0x500000).map_err(|e| e.to_string())?;
+    println!("alloc_size: {}", win_proc_list.alloc_size);
 
     for proc in win_proc_list.proc_list.iter() {
         println!("--------------------------------------------------");
@@ -20,4 +21,5 @@ fn main() {
         println!("PrivatePageCount: {}", proc.private_page_count);
         println!("--------------------------------------------------");
     }
+    Ok(())
 }
