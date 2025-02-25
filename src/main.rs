@@ -1,9 +1,7 @@
 use winproclist;
 
 fn main() -> Result<(), String> {
-    let mut win_proc_list = winproclist::WinProcList::new();
-    win_proc_list.get(0x500000).map_err(|e| e.to_string())?;
-    println!("alloc_size: {}", win_proc_list.alloc_size);
+    let mut win_proc_list = winproclist::get().map_err(|e| e.to_string())?;
 
     for proc in win_proc_list.proc_list.iter() {
         println!("--------------------------------------------------");
