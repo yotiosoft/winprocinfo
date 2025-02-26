@@ -74,7 +74,6 @@ fn get_system_processes_info() -> Result<BufferStruct, WinProcListError> {
         if NT_ERROR(status) {
             if status == STATUS_INFO_LENGTH_MISMATCH || status == STATUS_BUFFER_TOO_SMALL {
                 vfree(base_address, buffer_size as usize);
-                println!("size = {}", buffer_size);
             }
             else {
                 return Err(WinProcListError::CouldNotGetProcInfo(status));
@@ -92,13 +91,13 @@ fn get_system_processes_info() -> Result<BufferStruct, WinProcListError> {
 }
 
 fn get_proc_list(base_address: *mut c_void) -> Vec<ProcInfo> {
-    let mut system_process_information = get_proc_info(base_address as isize);
+    let mut system_process_information = read_proc_info(base_address as isize);
     let mut next_address = base_address as isize;
     let mut proc_list: Vec<ProcInfo> = Vec::new();
 
     loop {
         next_address += system_process_information.NextEntryOffset as isize;
-        system_process_information = get_proc_info(next_address);
+        system_process_information = read_proc_info(next_address);
 
         let proc_info: ProcInfo = ProcInfo {
             image_name: get_str_from_mem(system_process_information.ImageName.Buffer as *mut c_void, 0, system_process_information.ImageName.Length as usize),
@@ -126,7 +125,7 @@ fn get_proc_list(base_address: *mut c_void) -> Vec<ProcInfo> {
 }
 
 // プロセス一つ分の情報を取得
-fn get_proc_info(next_address: isize) -> SYSTEM_PROCESS_INFORMATION {
+fn read_proc_info(next_address: isize) -> SYSTEM_PROCESS_INFORMATION {
     unsafe {
         let mut system_process_info: SYSTEM_PROCESS_INFORMATION = std::mem::zeroed();
 
@@ -149,9 +148,7 @@ fn get_str_from_mem(base_address: *mut c_void, offset: usize, size: usize) -> St
         );
     }
 
-    let str = String::from_utf16_lossy(&vec).trim_matches(char::from(0)).to_string();
-
-    str
+    String::from_utf16_lossy(&vec).trim_matches(char::from(0)).to_string()
 }
 
 fn valloc(buffer_size: usize) -> *mut c_void {
@@ -166,4 +163,43 @@ fn vfree(addr: *mut c_void, buffer_size: usize) {
             VirtualFree(addr, buffer_size, MEM_RELEASE);
         }
     }
+}
+
+pub fn get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcListError> {
+    let buffer = get_system_processes_info()?;
+    let mut system_process_information = read_proc_info(buffer.base_address as isize);
+    let mut next_address = buffer.base_address as isize;
+
+    loop {
+        next_address += system_process_information.NextEntryOffset as isize;
+        system_process_information = read_proc_info(next_address);
+
+        if system_process_information.UniqueProcessId as u32 != pid {
+            if system_process_information.NextEntryOffset == 0 {
+                break;
+            }
+            continue;
+        }
+
+        let proc_info: ProcInfo = ProcInfo {
+            image_name: get_str_from_mem(system_process_information.ImageName.Buffer as *mut c_void, 0, system_process_information.ImageName.Length as usize),
+            unique_process_id: system_process_information.UniqueProcessId as u32,
+            handle_count: system_process_information.HandleCount,
+            session_id: system_process_information.SessionId,
+            peak_virtual_size: system_process_information.PeakVirtualSize,
+            virtual_size: system_process_information.VirtualSize,
+            peak_working_set_size: system_process_information.PeakWorkingSetSize,
+            quota_paged_pool_usage: system_process_information.QuotaPagedPoolUsage,
+            quota_non_paged_pool_usage: system_process_information.QuotaNonPagedPoolUsage,
+            pagefile_usage: system_process_information.PagefileUsage,
+            peak_pagefile_usage: system_process_information.PeakPagefileUsage,
+            private_page_count: system_process_information.PrivatePageCount,
+        };
+
+        vfree(buffer.base_address, buffer.alloc_size);
+        return Ok(Some(proc_info));
+    }
+
+    vfree(buffer.base_address, buffer.alloc_size);
+    Ok(None)
 }
