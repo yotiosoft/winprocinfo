@@ -37,11 +37,6 @@ pub struct ProcInfo {
     pub private_page_count: usize,
 }
 
-#[derive(Debug)]
-pub struct WinProcList {
-    pub proc_list: Vec<ProcInfo>,
-}
-
 struct BufferStruct {
     base_address: *mut c_void,
     alloc_size: usize,
@@ -52,10 +47,55 @@ impl Drop for BufferStruct {
     }
 }
 
+#[derive(Debug)]
+pub struct WinProcList {
+    pub proc_list: Vec<ProcInfo>,
+}
+
 pub fn get() -> Result<WinProcList, WinProcListError> {
     let buffer = get_system_processes_info()?;
     let list_vec = get_proc_list(buffer.base_address);
     Ok(WinProcList { proc_list: list_vec })
+}
+
+impl WinProcList {
+    pub fn search_by_pid(&self, pid: u32) -> Option<&ProcInfo> {
+        self.proc_list.iter().find(|&x| x.unique_process_id == pid)
+    }
+
+    pub fn search_by_name(&self, name: &str) -> Option<Vec<&ProcInfo>> {
+        let mut vec: Vec<&ProcInfo> = Vec::new();
+        for proc in self.proc_list.iter() {
+            if proc.image_name == name {
+                vec.push(proc);
+            }
+        }
+        if vec.is_empty() {
+            None
+        }
+        else {
+            Some(vec)
+        }
+    }
+
+    pub fn get_name_by_pid(&self, pid: u32) -> Option<&String> {
+        self.proc_list.iter().find(|&x| x.unique_process_id == pid).map(|x| &x.image_name)
+    }
+
+    pub fn get_pids_by_name(&self, name: &str) -> Option<Vec<u32>> {
+        let mut vec: Vec<u32> = Vec::new();
+        for proc in self.proc_list.iter() {
+            if proc.image_name == name {
+                vec.push(proc.unique_process_id);
+            }
+        }
+        if vec.is_empty() {
+            None
+        }
+        else {
+            Some(vec)
+        }
+    }
 }
 
 pub fn get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcListError> {
