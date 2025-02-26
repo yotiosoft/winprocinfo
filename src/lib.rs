@@ -21,8 +21,8 @@ impl Display for WinProcListError {
     }
 }
 
-#[derive(Debug)]
 pub struct ProcInfo {
+    pub next_entry_offset: u32,
     pub image_name: String,
     pub unique_process_id: u32,
     pub handle_count: u32,
@@ -35,6 +35,134 @@ pub struct ProcInfo {
     pub pagefile_usage: usize,
     pub peak_pagefile_usage: usize,
     pub private_page_count: usize,
+    pub number_of_threads: u32,
+    pub working_set_private_size: LargeInteger,
+    pub hard_fault_count: u32,
+    pub number_of_threads_high_watermark: u32,
+    pub cycle_time: u64,
+    pub create_time: LargeInteger,
+    pub user_time: LargeInteger,
+    pub kernel_time: LargeInteger,
+    pub base_priority: i32,
+    pub inherited_from_unique_process_id: *mut c_void,
+    pub unique_process_key: usize,
+    pub page_fault_count: u32,
+    pub working_set_size: usize,
+    pub quota_peak_paged_pool_usage: usize,
+    pub quota_peak_non_paged_pool_usage: usize,
+    pub read_operation_count: LargeInteger,
+    pub write_operation_count: LargeInteger,
+    pub other_operation_count: LargeInteger,
+    pub read_transfer_count: LargeInteger,
+    pub write_transfer_count: LargeInteger,
+    pub other_transfer_count: LargeInteger,
+    pub threads: Vec<ThreadInfo>,
+}
+impl ProcInfo {
+    pub fn set(raw_proc_info: &SYSTEM_PROCESS_INFORMATION) -> ProcInfo {
+        ProcInfo {
+            next_entry_offset: raw_proc_info.NextEntryOffset,
+            image_name: get_str_from_mem(raw_proc_info.ImageName.Buffer as *mut c_void, 0, raw_proc_info.ImageName.Length as usize),
+            unique_process_id: raw_proc_info.UniqueProcessId as u32,
+            handle_count: raw_proc_info.HandleCount,
+            session_id: raw_proc_info.SessionId,
+            peak_virtual_size: raw_proc_info.PeakVirtualSize,
+            virtual_size: raw_proc_info.VirtualSize,
+            peak_working_set_size: raw_proc_info.PeakWorkingSetSize,
+            quota_paged_pool_usage: raw_proc_info.QuotaPagedPoolUsage,
+            quota_non_paged_pool_usage: raw_proc_info.QuotaNonPagedPoolUsage,
+            pagefile_usage: raw_proc_info.PagefileUsage,
+            peak_pagefile_usage: raw_proc_info.PeakPagefileUsage,
+            private_page_count: raw_proc_info.PrivatePageCount,
+            number_of_threads: raw_proc_info.NumberOfThreads,
+            working_set_private_size: LargeInteger::set(&raw_proc_info.WorkingSetPrivateSize),
+            hard_fault_count: raw_proc_info.HardFaultCount,
+            number_of_threads_high_watermark: raw_proc_info.NumberOfThreadsHighWatermark,
+            cycle_time: raw_proc_info.CycleTime,
+            create_time: LargeInteger::set(&raw_proc_info.CreateTime),
+            user_time: LargeInteger::set(&raw_proc_info.UserTime),
+            kernel_time: LargeInteger::set(&raw_proc_info.KernelTime),
+            base_priority: raw_proc_info.BasePriority,
+            inherited_from_unique_process_id: raw_proc_info.InheritedFromUniqueProcessId,
+            unique_process_key: raw_proc_info.UniqueProcessKey,
+            page_fault_count: raw_proc_info.PageFaultCount,
+            working_set_size: raw_proc_info.WorkingSetSize,
+            quota_peak_paged_pool_usage: raw_proc_info.QuotaPeakPagedPoolUsage,
+            quota_peak_non_paged_pool_usage: raw_proc_info.QuotaPeakNonPagedPoolUsage,
+            read_operation_count: LargeInteger::set(&raw_proc_info.ReadOperationCount),
+            write_operation_count: LargeInteger::set(&raw_proc_info.WriteOperationCount),
+            other_operation_count: LargeInteger::set(&raw_proc_info.OtherOperationCount),
+            read_transfer_count: LargeInteger::set(&raw_proc_info.ReadTransferCount),
+            write_transfer_count: LargeInteger::set(&raw_proc_info.WriteTransferCount),
+            other_transfer_count: LargeInteger::set(&raw_proc_info.OtherTransferCount),
+            threads: (0..raw_proc_info.NumberOfThreads as usize).map(|x| ThreadInfo::set(raw_proc_info, x)).collect(),
+        }
+    }
+}
+
+pub struct ThreadInfo {
+    pub kernel_time: LargeInteger,
+    pub user_time: LargeInteger,
+    pub create_time: LargeInteger,
+    pub wait_time: u32,
+    pub start_address: *mut c_void,
+    pub priority: i32,
+    pub base_priority: i32,
+    pub context_switches: u32,
+    pub thread_state: u32,
+    pub wait_reason: u32,
+    pub client_id: ClientID,
+}
+impl ThreadInfo {
+    pub fn set(raw_proc_info: &SYSTEM_PROCESS_INFORMATION, index: usize) -> ThreadInfo {
+        let thread_info: SYSTEM_THREAD_INFORMATION = unsafe { std::mem::zeroed() };
+        println!("raw_proc_info.Threads.as_ptr() = {:x}", raw_proc_info.Threads.as_ptr() as usize + std::mem::size_of::<SYSTEM_THREAD_INFORMATION>() * index);
+        read_process_memory((raw_proc_info.Threads.as_ptr() as usize + std::mem::size_of::<SYSTEM_THREAD_INFORMATION>() * index) as *mut c_void, &thread_info as *const _ as *mut c_void, std::mem::size_of::<SYSTEM_THREAD_INFORMATION>());
+        ThreadInfo {
+            kernel_time: LargeInteger::set(&thread_info.KernelTime),
+            user_time: LargeInteger::set(&thread_info.UserTime),
+            create_time: LargeInteger::set(&thread_info.CreateTime),
+            wait_time: thread_info.WaitTime,
+            start_address: thread_info.StartAddress,
+            priority: thread_info.Priority,
+            base_priority: thread_info.BasePriority,
+            context_switches: thread_info.ContextSwitches,
+            thread_state: thread_info.ThreadState,
+            wait_reason: thread_info.WaitReason,
+            client_id: ClientID::set(&thread_info.ClientId),
+        }
+    }
+}
+
+pub struct ClientID {
+    pub unique_process_id: *mut c_void,
+    pub unique_thread_id: *mut c_void,
+}
+impl ClientID {
+    pub fn set(raw_client_id: &ntapi::ntapi_base::CLIENT_ID) -> ClientID {
+        ClientID {
+            unique_process_id: raw_client_id.UniqueProcess,
+            unique_thread_id: raw_client_id.UniqueThread,
+        }
+    }
+}
+
+pub struct LargeInteger {
+    pub low_part: u32,
+    pub high_part: i32,
+}
+impl LargeInteger {
+    pub fn set(raw_large_integer: &winapi::shared::ntdef::LARGE_INTEGER) -> LargeInteger {
+        let mut large_integer = LargeInteger {
+            low_part: 0,
+            high_part: 0,
+        };
+        read_process_memory(raw_large_integer as *const _ as *mut c_void, &mut large_integer as *mut _ as *mut c_void, std::mem::size_of::<LargeInteger>());
+        large_integer
+    }
+    pub fn to_u64(&self) -> u64 {
+        self.low_part as u64 | (self.high_part as u64) << 32
+    }
 }
 
 struct BufferStruct {
@@ -47,7 +175,6 @@ impl Drop for BufferStruct {
     }
 }
 
-#[derive(Debug)]
 pub struct WinProcList {
     pub proc_list: Vec<ProcInfo>,
 }
@@ -114,20 +241,7 @@ pub fn get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcListErr
             continue;
         }
 
-        let proc_info: ProcInfo = ProcInfo {
-            image_name: get_str_from_mem(system_process_information.ImageName.Buffer as *mut c_void, 0, system_process_information.ImageName.Length as usize),
-            unique_process_id: system_process_information.UniqueProcessId as u32,
-            handle_count: system_process_information.HandleCount,
-            session_id: system_process_information.SessionId,
-            peak_virtual_size: system_process_information.PeakVirtualSize,
-            virtual_size: system_process_information.VirtualSize,
-            peak_working_set_size: system_process_information.PeakWorkingSetSize,
-            quota_paged_pool_usage: system_process_information.QuotaPagedPoolUsage,
-            quota_non_paged_pool_usage: system_process_information.QuotaNonPagedPoolUsage,
-            pagefile_usage: system_process_information.PagefileUsage,
-            peak_pagefile_usage: system_process_information.PeakPagefileUsage,
-            private_page_count: system_process_information.PrivatePageCount,
-        };
+        let proc_info: ProcInfo = ProcInfo::set(&system_process_information);
 
         return Ok(Some(proc_info));
     }
@@ -177,20 +291,7 @@ fn get_proc_list(base_address: *mut c_void) -> Vec<ProcInfo> {
         next_address += system_process_information.NextEntryOffset as isize;
         system_process_information = read_proc_info(next_address);
 
-        let proc_info: ProcInfo = ProcInfo {
-            image_name: get_str_from_mem(system_process_information.ImageName.Buffer as *mut c_void, 0, system_process_information.ImageName.Length as usize),
-            unique_process_id: system_process_information.UniqueProcessId as u32,
-            handle_count: system_process_information.HandleCount,
-            session_id: system_process_information.SessionId,
-            peak_virtual_size: system_process_information.PeakVirtualSize,
-            virtual_size: system_process_information.VirtualSize,
-            peak_working_set_size: system_process_information.PeakWorkingSetSize,
-            quota_paged_pool_usage: system_process_information.QuotaPagedPoolUsage,
-            quota_non_paged_pool_usage: system_process_information.QuotaNonPagedPoolUsage,
-            pagefile_usage: system_process_information.PagefileUsage,
-            peak_pagefile_usage: system_process_information.PeakPagefileUsage,
-            private_page_count: system_process_information.PrivatePageCount,
-        };
+        let proc_info: ProcInfo = ProcInfo::set(&system_process_information);
 
         proc_list.push(proc_info);
 

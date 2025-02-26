@@ -14,6 +14,17 @@ fn print_proc_info(proc: &winproclist::ProcInfo) {
     println!("PagefileUsage: {}", proc.pagefile_usage);
     println!("PeakPagefileUsage: {}", proc.peak_pagefile_usage);
     println!("PrivatePageCount: {}", proc.private_page_count);
+    println!("ThreadCount: {}", proc.number_of_threads);
+    for thread in proc.threads.iter() {
+        println!("Thread:");
+        println!("  KernelTime: {}", thread.kernel_time.to_u64());
+        println!("  UserTime: {}", thread.user_time.to_u64());
+        println!("  CreateTime: {}", thread.create_time.to_u64());
+        println!("  WaitTime: {}", thread.wait_time);
+        println!("  ContextSwitches: {}", thread.context_switches);
+        println!("  Priority: {}", thread.priority);
+        println!("  BasePriority: {}", thread.base_priority);
+    }
     println!("======");
 }
 
