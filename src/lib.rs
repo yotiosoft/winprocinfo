@@ -63,8 +63,6 @@ impl ProcInfo {
         let raw_proc_info = raw_proc_info_buffer.base_address as *const SYSTEM_PROCESS_INFORMATION;
         let raw_proc_info = unsafe { *raw_proc_info };
 
-        println!("ptr: {:x}", raw_proc_info.Threads.as_ptr() as *const c_void as usize);
-        println!("PID: {}", raw_proc_info.UniqueProcessId as u32);
         let mut number_of_threads = raw_proc_info.NumberOfThreads;
         if raw_proc_info.UniqueProcessId as u32 == 4 {
             number_of_threads = 0;
@@ -104,7 +102,7 @@ impl ProcInfo {
             read_transfer_count: LargeInteger::set(&raw_proc_info.ReadTransferCount),
             write_transfer_count: LargeInteger::set(&raw_proc_info.WriteTransferCount),
             other_transfer_count: LargeInteger::set(&raw_proc_info.OtherTransferCount),
-            threads: get_thread_info_vec(raw_proc_info.Threads.as_ptr() as *const c_void, number_of_threads),
+            threads: get_thread_info_vec(&raw_proc_info_buffer, number_of_threads),
         }
     }
 }
@@ -140,15 +138,13 @@ impl ThreadInfo {
     }
 }
 
-fn get_thread_info_vec(thread_ptr: *const c_void, number_of_threads: u32) -> Vec<ThreadInfo> {
-    let thread_array_base = thread_ptr as usize;
+fn get_thread_info_vec(proc_info_buffer: &BufferStruct, number_of_threads: u32) -> Vec<ThreadInfo> {
+    let thread_array_base = proc_info_buffer.base_address as usize + std::mem::size_of::<SYSTEM_PROCESS_INFORMATION>() - std::mem::size_of::<*mut c_void>();
     let mut thread_info_vec: Vec<ThreadInfo> = Vec::new();
     for i in 0..number_of_threads as usize {
-        println!("i = {}, {} ptr:{:x}", i, number_of_threads, thread_array_base + i * std::mem::size_of::<SYSTEM_THREAD_INFORMATION>());
         let thread_info_ptr = (thread_array_base + i * std::mem::size_of::<SYSTEM_THREAD_INFORMATION>()) as *const SYSTEM_THREAD_INFORMATION;
         let thread_info = unsafe { *thread_info_ptr };
         let thread_info = ThreadInfo::set(&thread_info);
-        println!("thread_info: {}", thread_info.kernel_time.to_u64());
         thread_info_vec.push(thread_info);
     }
     thread_info_vec
@@ -188,11 +184,13 @@ impl LargeInteger {
 struct BufferStruct {
     base_address: *mut c_void,
     alloc_size: usize,
+    with_valloc: bool,
 }
 impl Drop for BufferStruct {
     fn drop(&mut self) {
-        println!("drop: {:x}", self.base_address as usize);
-        vfree(self.base_address, self.alloc_size);
+        if self.with_valloc {
+            vfree(self.base_address, self.alloc_size);
+        }
     }
 }
 impl BufferStruct {
@@ -200,6 +198,14 @@ impl BufferStruct {
         BufferStruct {
             base_address: valloc(size),
             alloc_size: size,
+            with_valloc: true,
+        }
+    }
+    fn with(base_address: *mut c_void, size: usize) -> BufferStruct {
+        BufferStruct {
+            base_address: base_address,
+            alloc_size: size,
+            with_valloc: false,
         }
     }
 }
@@ -260,12 +266,12 @@ pub fn get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcListErr
 
     loop {
         let system_process_information_buffer = read_proc_info(next_address as *mut c_void);
-        if system_process_information_buffer.alloc_size == 0 {
-            break;
-        }
 
         let entry_pid = unsafe { (system_process_information_buffer.base_address as *const SYSTEM_PROCESS_INFORMATION).read().UniqueProcessId as u32 };
         if entry_pid != pid {
+            if system_process_information_buffer.alloc_size == 0 {
+                break;
+            }
             next_address += system_process_information_buffer.alloc_size as isize;
             continue;
         }
@@ -289,7 +295,6 @@ fn get_system_processes_info() -> Result<BufferStruct, WinProcListError> {
     let mut buffer_size: u32 = 1024;
     let mut status;
     loop {
-        println!("buffer alloc: {}", buffer_size);
         let buffer = BufferStruct::alloc(buffer_size as usize);
         status = unsafe {
             NtQuerySystemInformation(SystemProcessInformation, buffer.base_address, buffer_size as u32, &mut buffer_size as *mut u32)
@@ -300,7 +305,6 @@ fn get_system_processes_info() -> Result<BufferStruct, WinProcListError> {
             }
         }
         else {
-            println!("buffer_size: {}", buffer_size);
             return Ok(buffer);
         }
     }
@@ -311,16 +315,13 @@ fn get_proc_list(base_address: *mut c_void) -> Vec<ProcInfo> {
     let mut proc_list: Vec<ProcInfo> = Vec::new();
 
     loop {
-        println!("before read_proc_info: {:x}", next_address);
         let system_process_information_buffer = read_proc_info(next_address as *mut c_void);
-        println!("after");
+        let proc_info: ProcInfo = ProcInfo::set(&system_process_information_buffer);
+        proc_list.push(proc_info);
+
         if system_process_information_buffer.alloc_size == 0 {
             break;
         }
-
-        let proc_info: ProcInfo = ProcInfo::set(&system_process_information_buffer);
-        println!("proc_info: {}", proc_info.image_name);
-        proc_list.push(proc_info);
 
         next_address += system_process_information_buffer.alloc_size as isize;
     }
@@ -333,21 +334,14 @@ fn read_proc_info(next_address: *mut c_void) -> BufferStruct {
     let next_entry_offset = unsafe { (next_address as *const SYSTEM_PROCESS_INFORMATION).read().NextEntryOffset };
     let number_of_threads = unsafe { (next_address as *const SYSTEM_PROCESS_INFORMATION).read().NumberOfThreads };
     let unique_process_id = unsafe { (next_address as *const SYSTEM_PROCESS_INFORMATION).read().UniqueProcessId };
-    println!("PID: {}", unique_process_id as u32);
-    println!("SYSTEM_PROCESS_INFORMATION size: {}", std::mem::size_of::<SYSTEM_PROCESS_INFORMATION>());
-    println!("SYSTEM_THREAD_INFORMATION size: {}", std::mem::size_of::<SYSTEM_THREAD_INFORMATION>());
-    println!("next_entry_offset * SYSTEM_THREAD_INFORMATION size: {}", std::mem::size_of::<SYSTEM_THREAD_INFORMATION>() * number_of_threads as usize);
-    println!("number_of_threads: {}", number_of_threads);
-    let mut system_process_info_buffer = BufferStruct::alloc(next_entry_offset as usize);
+    
+    let mut system_process_info_buffer = BufferStruct::with(next_address, next_entry_offset as usize);
     if next_entry_offset == 0 {
         return system_process_info_buffer;
     }
 
-    println!("next_entry_offset: {} next_address: {:?} base-address: {:?} alloc-size: {}", next_entry_offset, next_address, system_process_info_buffer.base_address, system_process_info_buffer.alloc_size);
     // base_address の該当オフセット値から SYSTEM_PROCESS_INFORMATION 構造体の情報をプロセス1つ分取得
-    //read_process_memory(next_address, &mut system_process_info_buffer.base_address as *mut _ as *mut c_void, system_process_info_buffer.alloc_size);
     system_process_info_buffer.base_address = next_address;
-    println!("base_address: {:x}", system_process_info_buffer.base_address as usize);
     system_process_info_buffer
 }
 
