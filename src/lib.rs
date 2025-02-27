@@ -60,6 +60,12 @@ pub struct ProcInfo {
 }
 impl ProcInfo {
     pub fn set(raw_proc_info: &SYSTEM_PROCESS_INFORMATION) -> ProcInfo {
+        println!("ptr: {:x}", raw_proc_info.Threads.as_ptr() as *const c_void as usize);
+        println!("PID: {}", raw_proc_info.UniqueProcessId as u32);
+        let mut number_of_threads = raw_proc_info.NumberOfThreads;
+        if raw_proc_info.UniqueProcessId as u32 == 4 {
+            number_of_threads = 0;
+        }
         ProcInfo {
             next_entry_offset: raw_proc_info.NextEntryOffset,
             image_name: get_str_from_mem(raw_proc_info.ImageName.Buffer as *mut c_void, 0, raw_proc_info.ImageName.Length as usize),
@@ -95,7 +101,7 @@ impl ProcInfo {
             read_transfer_count: LargeInteger::set(&raw_proc_info.ReadTransferCount),
             write_transfer_count: LargeInteger::set(&raw_proc_info.WriteTransferCount),
             other_transfer_count: LargeInteger::set(&raw_proc_info.OtherTransferCount),
-            threads: get_thread_info_vec(raw_proc_info),
+            threads: get_thread_info_vec(raw_proc_info.Threads.as_ptr() as *const c_void, number_of_threads),
         }
     }
 }
@@ -131,20 +137,16 @@ impl ThreadInfo {
     }
 }
 
-fn get_thread_info_vec(raw_proc_info: &SYSTEM_PROCESS_INFORMATION) -> Vec<ThreadInfo> {
-    let thread_array_base = raw_proc_info.Threads.as_ptr() as usize;
+fn get_thread_info_vec(thread_ptr: *const c_void, number_of_threads: u32) -> Vec<ThreadInfo> {
+    let thread_array_base = thread_ptr as usize;
     let mut thread_info_vec: Vec<ThreadInfo> = Vec::new();
-    for i in 0..raw_proc_info.NumberOfThreads as usize {
-        println!("i = {}, {} ptr:{:x}", i, raw_proc_info.NumberOfThreads, thread_array_base + i * std::mem::size_of::<SYSTEM_THREAD_INFORMATION>());
+    for i in 0..number_of_threads as usize {
+        println!("i = {}, {} ptr:{:x}", i, number_of_threads, thread_array_base + i * std::mem::size_of::<SYSTEM_THREAD_INFORMATION>());
         let thread_info_ptr = (thread_array_base + i * std::mem::size_of::<SYSTEM_THREAD_INFORMATION>()) as *const SYSTEM_THREAD_INFORMATION;
-        let thread_info = unsafe { &*thread_info_ptr };
+        let thread_info = unsafe { *thread_info_ptr };
         let thread_info = ThreadInfo::set(&thread_info);
         println!("thread_info: {}", thread_info.kernel_time.to_u64());
         thread_info_vec.push(thread_info);
-
-        if i == raw_proc_info.NumberOfThreads as usize - 1 {
-            break;
-        }
     }
     thread_info_vec
 }
@@ -306,6 +308,7 @@ fn get_proc_list(base_address: *mut c_void) -> Vec<ProcInfo> {
     loop {
         next_address += system_process_information.NextEntryOffset as isize;
         system_process_information = read_proc_info(next_address);
+        println!("system_process_information.NextEntryOffset = {}", system_process_information.NextEntryOffset);
 
         let proc_info: ProcInfo = ProcInfo::set(&system_process_information);
 
