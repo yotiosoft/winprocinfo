@@ -95,7 +95,7 @@ impl ProcInfo {
             read_transfer_count: LargeInteger::set(&raw_proc_info.ReadTransferCount),
             write_transfer_count: LargeInteger::set(&raw_proc_info.WriteTransferCount),
             other_transfer_count: LargeInteger::set(&raw_proc_info.OtherTransferCount),
-            threads: (0..raw_proc_info.NumberOfThreads as usize).map(|x| ThreadInfo::set(raw_proc_info, x)).collect(),
+            threads: get_thread_info_vec(raw_proc_info),
         }
     }
 }
@@ -114,10 +114,7 @@ pub struct ThreadInfo {
     pub client_id: ClientID,
 }
 impl ThreadInfo {
-    pub fn set(raw_proc_info: &SYSTEM_PROCESS_INFORMATION, index: usize) -> ThreadInfo {
-        let thread_info: SYSTEM_THREAD_INFORMATION = unsafe { std::mem::zeroed() };
-        println!("raw_proc_info.Threads.as_ptr() = {:x}", raw_proc_info.Threads.as_ptr() as usize + std::mem::size_of::<SYSTEM_THREAD_INFORMATION>() * index);
-        read_process_memory((raw_proc_info.Threads.as_ptr() as usize + std::mem::size_of::<SYSTEM_THREAD_INFORMATION>() * index) as *mut c_void, &thread_info as *const _ as *mut c_void, std::mem::size_of::<SYSTEM_THREAD_INFORMATION>());
+    pub fn set(thread_info: &SYSTEM_THREAD_INFORMATION) -> ThreadInfo {
         ThreadInfo {
             kernel_time: LargeInteger::set(&thread_info.KernelTime),
             user_time: LargeInteger::set(&thread_info.UserTime),
@@ -132,6 +129,24 @@ impl ThreadInfo {
             client_id: ClientID::set(&thread_info.ClientId),
         }
     }
+}
+
+fn get_thread_info_vec(raw_proc_info: &SYSTEM_PROCESS_INFORMATION) -> Vec<ThreadInfo> {
+    let thread_array_base = raw_proc_info.Threads.as_ptr() as usize;
+    let mut thread_info_vec: Vec<ThreadInfo> = Vec::new();
+    for i in 0..raw_proc_info.NumberOfThreads as usize {
+        println!("i = {}, {} ptr:{:x}", i, raw_proc_info.NumberOfThreads, thread_array_base + i * std::mem::size_of::<SYSTEM_THREAD_INFORMATION>());
+        let thread_info_ptr = (thread_array_base + i * std::mem::size_of::<SYSTEM_THREAD_INFORMATION>()) as *const SYSTEM_THREAD_INFORMATION;
+        let thread_info = unsafe { &*thread_info_ptr };
+        let thread_info = ThreadInfo::set(&thread_info);
+        println!("thread_info: {}", thread_info.kernel_time.to_u64());
+        thread_info_vec.push(thread_info);
+
+        if i == raw_proc_info.NumberOfThreads as usize - 1 {
+            break;
+        }
+    }
+    thread_info_vec
 }
 
 pub struct ClientID {
@@ -172,6 +187,14 @@ struct BufferStruct {
 impl Drop for BufferStruct {
     fn drop(&mut self) {
         vfree(self.base_address, self.alloc_size);
+    }
+}
+impl BufferStruct {
+    fn alloc(size: usize) -> BufferStruct {
+        BufferStruct {
+            base_address: valloc(size),
+            alloc_size: size,
+        }
     }
 }
 
@@ -252,8 +275,6 @@ pub fn get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcListErr
 // 現在動作中のすべてのプロセス情報を取得
 // SystemProcessInformation を buffer に取得
 fn get_system_processes_info() -> Result<BufferStruct, WinProcListError> {
-    let mut base_address = std::ptr::null_mut();
-
     // プロセス情報を取得
     // SystemProcessInformation : 各プロセスの情報（オプション定数）
     // base_address             : 格納先
@@ -262,24 +283,19 @@ fn get_system_processes_info() -> Result<BufferStruct, WinProcListError> {
     let mut buffer_size: u32 = 1024;
     let mut status;
     loop {
-        unsafe {
-            base_address = valloc(buffer_size as usize);
-            status = NtQuerySystemInformation(SystemProcessInformation, base_address, buffer_size as u32, &mut buffer_size as *mut u32);
-        }
+        let buffer = BufferStruct::alloc(buffer_size as usize);
+        status = unsafe {
+            NtQuerySystemInformation(SystemProcessInformation, buffer.base_address, buffer_size as u32, &mut buffer_size as *mut u32)
+        };
         if NT_ERROR(status) {
             if status != STATUS_INFO_LENGTH_MISMATCH && status != STATUS_BUFFER_TOO_SMALL {
                 return Err(WinProcListError::CouldNotGetProcInfo(status));
             }
         }
         else {
-            break;
+            return Ok(buffer);
         }
     }
-
-    return Ok(BufferStruct {
-        base_address: base_address,
-        alloc_size: buffer_size as usize,
-    });
 }
 
 fn get_proc_list(base_address: *mut c_void) -> Vec<ProcInfo> {
