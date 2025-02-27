@@ -1,124 +1,105 @@
 use winproclist;
+use std::fmt;
+
+fn print_proc_header() {
+    println!("{:<25} {:<10} {:<10} {:<10} {:<15} {:<15} {:<15} {:<10} {:<10}",
+        "ImageName", "PID", "Handles", "SessionId", "VirtualSize", "PagefileUsage", "PrivatePages", "Priority", "Threads");
+    println!("{:-<125}", "");
+}
+
+fn print_thread_header() {
+    println!("    {:<10} {:<15} {:<15} {:<20} {:<10} {:<15} {:<10}", "TID", "KernelTime", "UserTime", "CreateTime", "WaitTime", "ContextSwitches", "Priority");
+    println!("    {:-<121}", "");
+}
 
 fn print_proc_info(proc: &winproclist::ProcInfo) {
-    println!("======");
-    println!("ImageName: {}", proc.image_name);
-    println!("PID: {}", proc.unique_process_id);
-    println!("HandleCount: {}", proc.handle_count);
-    println!("SessionId: {}", proc.session_id);
-    println!("PeakVirtualSize: {}", proc.peak_virtual_size);
-    println!("VirtualSize: {}", proc.virtual_size);
-    println!("PeakWorkingSetSize: {}", proc.peak_working_set_size);
-    println!("QuotaPagedPoolUsage: {}", proc.quota_paged_pool_usage);
-    println!("QuotaNonPagedPoolUsage: {}", proc.quota_non_paged_pool_usage);
-    println!("PagefileUsage: {}", proc.pagefile_usage);
-    println!("PeakPagefileUsage: {}", proc.peak_pagefile_usage);
-    println!("PrivatePageCount: {}", proc.private_page_count);
-    println!("BasePriority: {}", proc.base_priority);
-    println!("ThreadCount: {}", proc.number_of_threads);
-    for thread in proc.threads.iter() {
-        println!("Thread - TID: {}", thread.client_id.unique_thread_id as u32);
-        println!("  KernelTime: {}", thread.kernel_time.to_u64());
-        println!("  UserTime: {}", thread.user_time.to_u64());
-        println!("  CreateTime: {}", thread.create_time.to_u64());
-        println!("  WaitTime: {}", thread.wait_time);
-        println!("  ContextSwitches: {}", thread.context_switches);
-        println!("  Priority: {}", thread.priority);
-        println!("  BasePriority: {}", thread.base_priority);
-        println!("  ClientID - UniqueProcess: {}", thread.client_id.unique_process_id as u32);
-        println!("  ClientID - UniqueThread: {}", thread.client_id.unique_thread_id as u32);
+    print_proc_header();
+    println!("{:<25} {:<10} {:<10} {:<10} {:<15} {:<15} {:<15} {:<10} {:<10}",
+        proc.image_name,
+        proc.unique_process_id,
+        proc.handle_count,
+        proc.session_id,
+        proc.virtual_size,
+        proc.pagefile_usage,
+        proc.private_page_count,
+        proc.base_priority,
+        proc.number_of_threads
+    );
+    
+    if !proc.threads.is_empty() {
+        print_thread_header();
+        for thread in &proc.threads {
+            println!("    {:<10} {:<15} {:<15} {:<20} {:<10} {:<15} {:<10}",
+                thread.client_id.unique_thread_id as u32,
+                thread.kernel_time.to_u64(),
+                thread.user_time.to_u64(),
+                thread.create_time.to_u64(),
+                thread.wait_time,
+                thread.context_switches,
+                thread.priority
+            );
+        }
     }
-    println!("======");
+    println!("{:-<125}", "");
 }
 
 fn main() -> Result<(), String> {
-    // Print all processes.
-    println!("PRINT ALL PROCESSES");
-    println!("--------------------------------------------------");
     let win_proc_list = winproclist::get().map_err(|e| e.to_string())?;
+    
     for proc in win_proc_list.proc_list.iter() {
         print_proc_info(proc);
     }
-    println!("--------------------------------------------------");
-    println!("");
 
-    // Search by this process id.
+    println!("\n{:=<125}", "");
+    
     let pid = std::process::id();
-    println!("PRINT CURRENT PROCESS");
-    println!("--------------------------------------------------");
-    println!("Current process: {}", pid);
-    println!("search_by_pid: {}", pid);
-    let proc = win_proc_list.search_by_pid(pid);
-    if let Some(proc) = proc {
+    println!("\nSearch by this process id: {}", pid);
+    if let Some(proc) = win_proc_list.search_by_pid(pid) {
         print_proc_info(proc);
+    } else {
+        println!("Process not found.");
     }
-    else {
-        println!("Current process not found.");
-    }
-    println!("--------------------------------------------------");
-    println!("");
 
-    // Search by this process name.
-    println!("SEARCH BY PROCESS NAME");
+    println!("\n{:=<125}", "");
+    
     let name = "winproclist.exe";
-    println!("--------------------------------------------------");
-    println!("search_by_name: WinProcList");
-    let procs = win_proc_list.search_by_name(name);
-    if let Some(procs) = procs {
+    println!("\nSearch by process name: {}", name);
+    if let Some(procs) = win_proc_list.search_by_name(name) {
         for proc in procs.iter() {
             print_proc_info(proc);
         }
-    }
-    else {
+    } else {
         println!("Process not found.");
     }
-    println!("--------------------------------------------------");
-    println!("");
 
-    // Get pid by this process name.
-    println!("GET PID BY PROCESS NAME");
-    println!("--------------------------------------------------");
-    println!("get_pids_by_name: WinProcList");
-    let pids = win_proc_list.get_pids_by_name(name);
-    if let Some(pids) = pids {
+    println!("\n{:=<125}", "");
+    
+    println!("\nGet PID by process name: {}", name);
+    if let Some(pids) = win_proc_list.get_pids_by_name(name) {
         for pid in pids.iter() {
             println!("PID: {}", pid);
         }
-    }
-    else {
+    } else {
         println!("Process not found.");
     }
-    println!("--------------------------------------------------");
-    println!("");
 
-    // Get process name by this process id.
-    println!("GET PROCESS NAME BY PID");
-    println!("--------------------------------------------------");
-    println!("get_name_by_pid: {}", pid);
-    let name = win_proc_list.get_name_by_pid(pid);
-    if let Some(name) = name {
+    println!("\n{:=<125}", "");
+    
+    println!("\nGet process name by PID: {}", pid);
+    if let Some(name) = win_proc_list.get_name_by_pid(pid) {
         println!("Process name: {}", name);
-    }
-    else {
+    } else {
         println!("Process not found.");
     }
-    println!("--------------------------------------------------");
-    println!("");
 
-    // Get process info by this process id.
-    println!("GET A PROCESS INFO BY PID");
-    let pid = std::process::id();
-    println!("--------------------------------------------------");
-    println!("Current process: {}", pid);
-    println!("Get from get_proc_info_by_pid");
-    let proc = winproclist::get_proc_info_by_pid(pid).map_err(|e| e.to_string())?;
-    if let Some(proc) = proc {
+    println!("\n{:=<125}", "");
+    
+    println!("\nGet process info by PID: {}", pid);
+    if let Some(proc) = winproclist::get_proc_info_by_pid(pid).map_err(|e| e.to_string())? {
         print_proc_info(&proc);
+    } else {
+        println!("Process not found.");
     }
-    else {
-        println!("Current process not found.");
-    }
-    println!("--------------------------------------------------");
-
+    
     Ok(())
 }
