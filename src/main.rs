@@ -14,6 +14,7 @@ fn print_proc_info(proc: &winproclist::ProcInfo) {
     println!("PagefileUsage: {}", proc.pagefile_usage);
     println!("PeakPagefileUsage: {}", proc.peak_pagefile_usage);
     println!("PrivatePageCount: {}", proc.private_page_count);
+    println!("BasePriority: {}", proc.base_priority);
     println!("ThreadCount: {}", proc.number_of_threads);
     for thread in proc.threads.iter() {
         println!("Thread:");
@@ -24,6 +25,8 @@ fn print_proc_info(proc: &winproclist::ProcInfo) {
         println!("  ContextSwitches: {}", thread.context_switches);
         println!("  Priority: {}", thread.priority);
         println!("  BasePriority: {}", thread.base_priority);
+        println!("  ClientID - UniqueProcess: {}", thread.client_id.unique_process_id as u32);
+        println!("  ClientID - UniqueThread: {}", thread.client_id.unique_thread_id as u32);
     }
     println!("======");
 }

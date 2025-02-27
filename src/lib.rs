@@ -59,14 +59,11 @@ pub struct ProcInfo {
     pub threads: Vec<ThreadInfo>,
 }
 impl ProcInfo {
-    pub fn set(raw_proc_info_buffer: &BufferStruct) -> ProcInfo {
+    fn set(raw_proc_info_buffer: &BufferStruct) -> ProcInfo {
         let raw_proc_info = raw_proc_info_buffer.base_address as *const SYSTEM_PROCESS_INFORMATION;
         let raw_proc_info = unsafe { *raw_proc_info };
 
-        let mut number_of_threads = raw_proc_info.NumberOfThreads;
-        if raw_proc_info.UniqueProcessId as u32 == 4 {
-            number_of_threads = 0;
-        }
+        let number_of_threads = raw_proc_info.NumberOfThreads;
         ProcInfo {
             next_entry_offset: raw_proc_info.NextEntryOffset,
             image_name: get_str_from_mem(raw_proc_info.ImageName.Buffer as *mut c_void, 0, raw_proc_info.ImageName.Length as usize),
@@ -139,7 +136,7 @@ impl ThreadInfo {
 }
 
 fn get_thread_info_vec(proc_info_buffer: &BufferStruct, number_of_threads: u32) -> Vec<ThreadInfo> {
-    let thread_array_base = proc_info_buffer.base_address as usize + std::mem::size_of::<SYSTEM_PROCESS_INFORMATION>() - std::mem::size_of::<*mut c_void>();
+    let thread_array_base = proc_info_buffer.base_address as usize + std::mem::size_of::<SYSTEM_PROCESS_INFORMATION>() - std::mem::size_of::<SYSTEM_THREAD_INFORMATION>();
     let mut thread_info_vec: Vec<ThreadInfo> = Vec::new();
     for i in 0..number_of_threads as usize {
         let thread_info_ptr = (thread_array_base + i * std::mem::size_of::<SYSTEM_THREAD_INFORMATION>()) as *const SYSTEM_THREAD_INFORMATION;
@@ -332,8 +329,6 @@ fn get_proc_list(base_address: *mut c_void) -> Vec<ProcInfo> {
 // プロセス一つ分の情報を取得
 fn read_proc_info(next_address: *mut c_void) -> BufferStruct {
     let next_entry_offset = unsafe { (next_address as *const SYSTEM_PROCESS_INFORMATION).read().NextEntryOffset };
-    let number_of_threads = unsafe { (next_address as *const SYSTEM_PROCESS_INFORMATION).read().NumberOfThreads };
-    let unique_process_id = unsafe { (next_address as *const SYSTEM_PROCESS_INFORMATION).read().UniqueProcessId };
     
     let mut system_process_info_buffer = BufferStruct::with(next_address, next_entry_offset as usize);
     if next_entry_offset == 0 {
