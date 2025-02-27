@@ -17,7 +17,7 @@ fn print_proc_info(proc: &winproclist::ProcInfo) {
     println!("BasePriority: {}", proc.base_priority);
     println!("ThreadCount: {}", proc.number_of_threads);
     for thread in proc.threads.iter() {
-        println!("Thread:");
+        println!("Thread - TID: {}", thread.client_id.unique_thread_id as u32);
         println!("  KernelTime: {}", thread.kernel_time.to_u64());
         println!("  UserTime: {}", thread.user_time.to_u64());
         println!("  CreateTime: {}", thread.create_time.to_u64());
@@ -33,16 +33,18 @@ fn print_proc_info(proc: &winproclist::ProcInfo) {
 
 fn main() -> Result<(), String> {
     // Print all processes.
+    println!("PRINT ALL PROCESSES");
     println!("--------------------------------------------------");
-    println!("All processes:");
     let win_proc_list = winproclist::get().map_err(|e| e.to_string())?;
     for proc in win_proc_list.proc_list.iter() {
         print_proc_info(proc);
     }
     println!("--------------------------------------------------");
+    println!("");
 
     // Search by this process id.
     let pid = std::process::id();
+    println!("PRINT CURRENT PROCESS");
     println!("--------------------------------------------------");
     println!("Current process: {}", pid);
     println!("search_by_pid: {}", pid);
@@ -54,8 +56,10 @@ fn main() -> Result<(), String> {
         println!("Current process not found.");
     }
     println!("--------------------------------------------------");
+    println!("");
 
     // Search by this process name.
+    println!("SEARCH BY PROCESS NAME");
     let name = "winproclist.exe";
     println!("--------------------------------------------------");
     println!("search_by_name: WinProcList");
@@ -69,8 +73,10 @@ fn main() -> Result<(), String> {
         println!("Process not found.");
     }
     println!("--------------------------------------------------");
+    println!("");
 
     // Get pid by this process name.
+    println!("GET PID BY PROCESS NAME");
     println!("--------------------------------------------------");
     println!("get_pids_by_name: WinProcList");
     let pids = win_proc_list.get_pids_by_name(name);
@@ -83,8 +89,10 @@ fn main() -> Result<(), String> {
         println!("Process not found.");
     }
     println!("--------------------------------------------------");
+    println!("");
 
     // Get process name by this process id.
+    println!("GET PROCESS NAME BY PID");
     println!("--------------------------------------------------");
     println!("get_name_by_pid: {}", pid);
     let name = win_proc_list.get_name_by_pid(pid);
@@ -95,8 +103,10 @@ fn main() -> Result<(), String> {
         println!("Process not found.");
     }
     println!("--------------------------------------------------");
+    println!("");
 
     // Get process info by this process id.
+    println!("GET A PROCESS INFO BY PID");
     let pid = std::process::id();
     println!("--------------------------------------------------");
     println!("Current process: {}", pid);
