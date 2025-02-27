@@ -102,6 +102,50 @@ impl ProcInfo {
             threads: get_thread_info_vec(&raw_proc_info_buffer, number_of_threads),
         }
     }
+
+    pub fn to_ntapi(&self) -> SYSTEM_PROCESS_INFORMATION {
+        SYSTEM_PROCESS_INFORMATION {
+            NextEntryOffset: self.next_entry_offset,
+            ImageName: UNICODE_STRING {
+                Length: self.image_name.len() as u16,
+                MaximumLength: self.image_name.len() as u16,
+                Buffer: self.image_name.as_ptr() as *mut u16,
+            },
+            UniqueProcessId: self.unique_process_id as *mut c_void,
+            HandleCount: self.handle_count,
+            SessionId: self.session_id,
+            PeakVirtualSize: self.peak_virtual_size,
+            VirtualSize: self.virtual_size,
+            PeakWorkingSetSize: self.peak_working_set_size,
+            QuotaPagedPoolUsage: self.quota_paged_pool_usage,
+            QuotaNonPagedPoolUsage: self.quota_non_paged_pool_usage,
+            PagefileUsage: self.pagefile_usage,
+            PeakPagefileUsage: self.peak_pagefile_usage,
+            PrivatePageCount: self.private_page_count,
+            NumberOfThreads: self.number_of_threads,
+            WorkingSetPrivateSize: self.working_set_private_size.to_ntapi(),
+            HardFaultCount: self.hard_fault_count,
+            NumberOfThreadsHighWatermark: self.number_of_threads_high_watermark,
+            CycleTime: self.cycle_time,
+            CreateTime: self.create_time.to_ntapi(),
+            UserTime: self.user_time.to_ntapi(),
+            KernelTime: self.kernel_time.to_ntapi(),
+            BasePriority: self.base_priority,
+            InheritedFromUniqueProcessId: self.inherited_from_unique_process_id,
+            UniqueProcessKey: self.unique_process_key,
+            PageFaultCount: self.page_fault_count,
+            WorkingSetSize: self.working_set_size,
+            QuotaPeakPagedPoolUsage: self.quota_peak_paged_pool_usage,
+            QuotaPeakNonPagedPoolUsage: self.quota_peak_non_paged_pool_usage,
+            ReadOperationCount: self.read_operation_count.to_ntapi(),
+            WriteOperationCount: self.write_operation_count.to_ntapi(),
+            OtherOperationCount: self.other_operation_count.to_ntapi(),
+            ReadTransferCount: self.read_transfer_count.to_ntapi(),
+            WriteTransferCount: self.write_transfer_count.to_ntapi(),
+            OtherTransferCount: self.other_transfer_count.to_ntapi(),
+            Threads: [self.threads[0].to_ntapi(); 1],
+        }
+    }
 }
 
 pub struct ThreadInfo {
@@ -131,6 +175,25 @@ impl ThreadInfo {
             thread_state: thread_info.ThreadState,
             wait_reason: thread_info.WaitReason,
             client_id: ClientID::set(&thread_info.ClientId),
+        }
+    }
+
+    pub fn to_ntapi(&self) -> SYSTEM_THREAD_INFORMATION {
+        SYSTEM_THREAD_INFORMATION {
+            KernelTime: self.kernel_time.to_ntapi(),
+            UserTime: self.user_time.to_ntapi(),
+            CreateTime: self.create_time.to_ntapi(),
+            WaitTime: self.wait_time,
+            StartAddress: self.start_address,
+            Priority: self.priority,
+            BasePriority: self.base_priority,
+            ContextSwitches: self.context_switches,
+            ThreadState: self.thread_state,
+            WaitReason: self.wait_reason,
+            ClientId: ntapi::ntapi_base::CLIENT_ID {
+                UniqueProcess: self.client_id.unique_process_id,
+                UniqueThread: self.client_id.unique_thread_id,
+            },
         }
     }
 }
@@ -175,6 +238,11 @@ impl LargeInteger {
     }
     pub fn to_u64(&self) -> u64 {
         self.low_part as u64 | (self.high_part as u64) << 32
+    }
+    pub fn to_ntapi(&self) -> winapi::shared::ntdef::LARGE_INTEGER {
+        let mut large_integer: winapi::shared::ntdef::LARGE_INTEGER = unsafe { std::mem::zeroed() };
+        read_process_memory(self as *const _ as *mut c_void, &mut large_integer as *mut _ as *mut c_void, std::mem::size_of::<LargeInteger>());
+        large_integer
     }
 }
 
