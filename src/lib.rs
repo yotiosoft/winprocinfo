@@ -10,19 +10,19 @@ use ntapi::ntexapi::*;
 
 /// An enumeration representing possible errors that can occur while obtaining process information.
 #[derive(Debug, Clone, PartialEq)]
-pub enum WinProcListError {
+pub enum WinProcInfoError {
     /// Could not obtain process information.
     CouldNotGetProcInfo(i32),
     /// The buffer size was too small to hold the process information.
     BufferSizeTooSmall(usize, usize),
 }
 
-impl Display for WinProcListError {
+impl Display for WinProcInfoError {
     /// Formats the error message for displaying.
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            WinProcListError::CouldNotGetProcInfo(status) => write!(f, "Could not get process information. Status: 0x{:X}", status),
-            WinProcListError::BufferSizeTooSmall(alloc_size, req_size) => write!(f, "Buffer size too small. You need at least {} bytes, but only allocated {} bytes.", req_size, alloc_size),
+            WinProcInfoError::CouldNotGetProcInfo(status) => write!(f, "Could not get process information. Status: 0x{:X}", status),
+            WinProcInfoError::BufferSizeTooSmall(alloc_size, req_size) => write!(f, "Buffer size too small. You need at least {} bytes, but only allocated {} bytes.", req_size, alloc_size),
         }
     }
 }
@@ -314,8 +314,8 @@ pub struct WinProcList {
 /// 
 /// # Returns
 /// 
-/// * `Result<WinProcList, WinProcListError>` - A result containing either the WinProcList struct or a WinProcListError.
-pub fn get() -> Result<WinProcList, WinProcListError> {
+/// * `Result<WinProcList, WinProcInfoError>` - A result containing either the WinProcList struct or a WinProcInfoError.
+pub fn get() -> Result<WinProcList, WinProcInfoError> {
     let buffer = get_system_processes_info()?;
     let list_vec = get_proc_list(buffer.base_address);
     Ok(WinProcList { proc_list: list_vec })
@@ -400,8 +400,8 @@ impl WinProcList {
 /// 
 /// # Returns
 /// 
-/// * `Result<Option<ProcInfo>, WinProcListError>` - A result containing either an option with the ProcInfo struct or a WinProcListError.
-pub fn get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcListError> {
+/// * `Result<Option<ProcInfo>, WinProcInfoError>` - A result containing either an option with the ProcInfo struct or a WinProcInfoError.
+pub fn get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcInfoError> {
     let buffer = get_system_processes_info()?;
     let mut next_address = buffer.base_address as isize;
 
@@ -431,8 +431,8 @@ pub fn get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcListErr
 /// 
 /// # Returns
 /// 
-/// * `Result<BufferStruct, WinProcListError>` - A result containing either the BufferStruct with process information or a WinProcListError.
-fn get_system_processes_info() -> Result<BufferStruct, WinProcListError> {
+/// * `Result<BufferStruct, WinProcInfoError>` - A result containing either the BufferStruct with process information or a WinProcInfoError.
+fn get_system_processes_info() -> Result<BufferStruct, WinProcInfoError> {
     let mut buffer_size: u32 = 1024;
     let mut status;
     loop {
@@ -442,7 +442,7 @@ fn get_system_processes_info() -> Result<BufferStruct, WinProcListError> {
         };
         if NT_ERROR(status) {
             if status != STATUS_INFO_LENGTH_MISMATCH && status != STATUS_BUFFER_TOO_SMALL {
-                return Err(WinProcListError::CouldNotGetProcInfo(status));
+                return Err(WinProcInfoError::CouldNotGetProcInfo(status));
             }
         }
         else {
