@@ -99,41 +99,9 @@ fn main() -> Result<(), String> {
     println!("\nGet process info by PID: {}", pid);
     if let Some(proc) = winprocinfo::get_proc_info_by_pid(pid).map_err(|e| e.to_string())? {
         print_proc_info(&proc);
-        let proc_name = proc.to_ntapi().ImageName;
-        println!("len: {} buf: {:?}", proc_name.Length, proc_name.Buffer);
-        let proc_name = get_str_from_mem(proc_name.Buffer as *mut c_void, 0, proc_name.Length as usize);
-        println!("Process name: {:?}", proc_name);
-        let raw_val = proc.to_ntapi().Threads[0].CreateTime;
-        let val = LargeInteger::from(&raw_val);
-        println!("TID 1 create time: {:?}", val.to_u64());
     } else {
         println!("Process not found.");
     }
     
     Ok(())
-}
-
-
-
-
-use winapi::ctypes::c_void;
-use winapi::ctypes::*;
-use winapi::um::memoryapi::*;
-use winapi::um::processthreadsapi::*;
-use winapi::um::winnt::{ MEM_COMMIT, MEM_RELEASE, PAGE_EXECUTE_READWRITE };
-use winapi::shared::ntstatus::{ STATUS_BUFFER_TOO_SMALL, STATUS_INFO_LENGTH_MISMATCH };
-use winapi::shared::ntdef::*;
-use ntapi::ntexapi::*;
-use winprocinfo::LargeInteger;
-fn get_str_from_mem(base_address: *mut c_void, offset: usize, size: usize) -> String {
-    let mut vec: Vec<u16> = vec![0; size];
-    read_process_memory((base_address as usize + offset) as *mut c_void, vec.as_mut_ptr() as *mut c_void, size);
-    String::from_utf16_lossy(&vec).trim_matches(char::from(0)).to_string()
-}
-fn read_process_memory(base_address: *mut c_void, buffer: *mut c_void, buffer_size: usize) {
-    unsafe {
-        ReadProcessMemory(
-            GetCurrentProcess(), base_address, buffer, buffer_size, std::ptr::null_mut()
-        );
-    }
 }
