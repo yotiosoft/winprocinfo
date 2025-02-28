@@ -111,8 +111,8 @@ impl LargeInteger {
 
 ```rust
 pub struct ClientID {
-    pub unique_thread_id: usize,
-    pub unique_process_id: usize,
+    pub unique_process_id: u32,
+    pub unique_thread_id: u32,
 }
 ```
 

@@ -211,8 +211,8 @@ impl ThreadInfo {
             ThreadState: self.thread_state,
             WaitReason: self.wait_reason,
             ClientId: ntapi::ntapi_base::CLIENT_ID {
-                UniqueProcess: self.client_id.unique_process_id,
-                UniqueThread: self.client_id.unique_thread_id,
+                UniqueProcess: self.client_id.unique_process_id as *mut c_void,
+                UniqueThread: self.client_id.unique_thread_id as *mut c_void,
             },
         }
     }
@@ -230,16 +230,16 @@ fn get_thread_info_vec(proc_info_buffer: &BufferStruct, number_of_threads: u32) 
 
 /// A struct representing the client ID, including unique process and thread IDs.
 pub struct ClientID {
-    pub unique_process_id: *mut c_void,
-    pub unique_thread_id: *mut c_void,
+    pub unique_process_id: u32,
+    pub unique_thread_id: u32,
 }
 
 impl ClientID {
     /// Sets the client ID from the given CLIENT_ID struct.
     pub fn from(raw_client_id: &ntapi::ntapi_base::CLIENT_ID) -> ClientID {
         ClientID {
-            unique_process_id: raw_client_id.UniqueProcess,
-            unique_thread_id: raw_client_id.UniqueThread,
+            unique_process_id: raw_client_id.UniqueProcess as u32,
+            unique_thread_id: raw_client_id.UniqueThread as u32,
         }
     }
 }
