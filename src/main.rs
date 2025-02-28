@@ -43,7 +43,7 @@ fn print_proc_info(proc: &winprocinfo::ProcInfo) {
 }
 
 fn main() -> Result<(), String> {
-    let win_proc_list = winprocinfo::get().map_err(|e| e.to_string())?;
+    let win_proc_list = winprocinfo::get_list().map_err(|e| e.to_string())?;
     
     for proc in win_proc_list.proc_list.iter() {
         print_proc_info(proc);

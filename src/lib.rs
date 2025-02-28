@@ -315,7 +315,7 @@ pub struct WinProcList {
 /// # Returns
 /// 
 /// * `Result<WinProcList, WinProcInfoError>` - A result containing either the WinProcList struct or a WinProcInfoError.
-pub fn get() -> Result<WinProcList, WinProcInfoError> {
+pub fn get_list() -> Result<WinProcList, WinProcInfoError> {
     let buffer = get_system_processes_info()?;
     let list_vec = get_proc_list(buffer.base_address);
     Ok(WinProcList { proc_list: list_vec })

@@ -10,7 +10,7 @@ WinProcInfo is a Rust library that utilizes Windows API to retrieve information 
 ## Methods for Retrieving Process Information
 
 1. **Retrieving information of all processes and threads**
-   - Use `winprocinfo::get()` to retrieve information on all processes and threads at once.
+   - Use `winprocinfo::get_list()` to retrieve information on all processes and threads at once.
    - Within the retrieved `WinProcList`, it is possible to search by process name or PID.
    - Effective when you want to retrieve multiple process information at once.
 
@@ -122,7 +122,7 @@ pub struct ClientID {
 use winprocinfo;
 
 fn main() {
-    let proc_list = winprocinfo::get().expect("Failed to retrieve process list");
+    let proc_list = winprocinfo::get_list().expect("Failed to retrieve process list");
     for proc in proc_list.proc_list.iter() {
         println!("PID: {}, Name: {}", proc.unique_process_id, proc.image_name);
     }
@@ -143,13 +143,12 @@ fn main() {
 }
 ```
 
-
 ### Example: Searching for a process by name
 ```rust
 use winprocinfo;
 
 fn main() {
-    let proc_list = winprocinfo::get().expect("Failed to retrieve process list");
+    let proc_list = winprocinfo::get_list().expect("Failed to retrieve process list");
     let process_name = "cargo.exe";
     println!("\nSearch by process name: {}", process_name);
     let procs = proc_list.search_by_name(process_name);
@@ -212,7 +211,7 @@ fn print_proc_info(proc: &winprocinfo::ProcInfo) {
 }
 
 fn main() -> Result<(), String> {
-    let win_proc_list = winprocinfo::get().map_err(|e| e.to_string())?;
+    let win_proc_list = winprocinfo::get_list().map_err(|e| e.to_string())?;
     
     for proc in win_proc_list.proc_list.iter() {
         print_proc_info(proc);
