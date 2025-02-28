@@ -1,5 +1,4 @@
 use winproclist;
-use std::fmt;
 
 fn print_proc_header() {
     println!("{:<25} {:<10} {:<10} {:<10} {:<15} {:<15} {:<15} {:<10} {:<10}",

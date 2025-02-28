@@ -168,7 +168,6 @@ fn main() {
 Print all process and thread information, search by PID, search by process name, get PID by process name, get process name by PID, and get process info by PID.
 ```rust
 use winproclist;
-use std::fmt;
 
 fn print_proc_header() {
     println!("{:<25} {:<10} {:<10} {:<10} {:<15} {:<15} {:<15} {:<10} {:<10}",

@@ -8,12 +8,17 @@ use winapi::shared::ntstatus::{ STATUS_BUFFER_TOO_SMALL, STATUS_INFO_LENGTH_MISM
 use winapi::shared::ntdef::*;
 use ntapi::ntexapi::*;
 
+/// An enumeration representing possible errors that can occur while obtaining process information.
 #[derive(Debug, Clone, PartialEq)]
 pub enum WinProcListError {
+    /// Could not obtain process information.
     CouldNotGetProcInfo(i32),
+    /// The buffer size was too small to hold the process information.
     BufferSizeTooSmall(usize, usize),
 }
+
 impl Display for WinProcListError {
+    /// Formats the error message for displaying.
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             WinProcListError::CouldNotGetProcInfo(status) => write!(f, "Could not get process information. Status: 0x{:X}", status),
@@ -22,6 +27,8 @@ impl Display for WinProcListError {
     }
 }
 
+/// A struct representing the information of a process.
+/// Each member variable corresponds to the member variables of the SYSTEM_PROCESS_INFORMATION structure in the ntapi crate.
 pub struct ProcInfo {
     pub next_entry_offset: u32,
     pub image_name: String,
@@ -59,7 +66,9 @@ pub struct ProcInfo {
     pub other_transfer_count: LargeInteger,
     pub threads: Vec<ThreadInfo>,
 }
+
 impl ProcInfo {
+    /// Sets the process information from the given raw process information buffer.
     fn set(raw_proc_info_buffer: &BufferStruct) -> ProcInfo {
         let raw_proc_info = raw_proc_info_buffer.base_address as *const SYSTEM_PROCESS_INFORMATION;
         let raw_proc_info = unsafe { *raw_proc_info };
@@ -104,6 +113,7 @@ impl ProcInfo {
         }
     }
 
+    /// Converts the ProcInfo struct to the SYSTEM_PROCESS_INFORMATION struct used by ntapi.
     pub fn to_ntapi(&self) -> SYSTEM_PROCESS_INFORMATION {
         SYSTEM_PROCESS_INFORMATION {
             NextEntryOffset: self.next_entry_offset,
@@ -149,6 +159,8 @@ impl ProcInfo {
     }
 }
 
+/// A struct representing the information of a thread.
+/// Each member variable corresponds to the member variables of the SYSTEM_THREAD_INFORMATION structure in the ntapi crate.
 pub struct ThreadInfo {
     pub kernel_time: LargeInteger,
     pub user_time: LargeInteger,
@@ -162,7 +174,9 @@ pub struct ThreadInfo {
     pub wait_reason: u32,
     pub client_id: ClientID,
 }
+
 impl ThreadInfo {
+    /// Sets the thread information from the given SYSTEM_THREAD_INFORMATION.
     pub fn set(thread_info: &SYSTEM_THREAD_INFORMATION) -> ThreadInfo {
         ThreadInfo {
             kernel_time: LargeInteger::set(&thread_info.KernelTime),
@@ -179,6 +193,7 @@ impl ThreadInfo {
         }
     }
 
+    /// Converts the ThreadInfo struct to the SYSTEM_THREAD_INFORMATION struct used by ntapi.
     pub fn to_ntapi(&self) -> SYSTEM_THREAD_INFORMATION {
         SYSTEM_THREAD_INFORMATION {
             KernelTime: self.kernel_time.to_ntapi(),
@@ -199,21 +214,24 @@ impl ThreadInfo {
     }
 }
 
+/// Retrieves a vector of ThreadInfo from the given process information buffer.
 fn get_thread_info_vec(proc_info_buffer: &BufferStruct, number_of_threads: u32) -> Vec<ThreadInfo> {
     let thread_array_base = proc_info_buffer.base_address as usize + std::mem::size_of::<SYSTEM_PROCESS_INFORMATION>() - std::mem::size_of::<SYSTEM_THREAD_INFORMATION>();
-    let mut thread_info_vec: Vec<ThreadInfo> = unsafe { 
+    unsafe { 
         std::slice::from_raw_parts(thread_array_base as *const SYSTEM_THREAD_INFORMATION, number_of_threads as usize)
             .iter()
             .map(|x| ThreadInfo::set(x)).collect() 
-    };
-    thread_info_vec
+    }
 }
 
+/// A struct representing the client ID, including unique process and thread IDs.
 pub struct ClientID {
     pub unique_process_id: *mut c_void,
     pub unique_thread_id: *mut c_void,
 }
+
 impl ClientID {
+    /// Sets the client ID from the given CLIENT_ID struct.
     pub fn set(raw_client_id: &ntapi::ntapi_base::CLIENT_ID) -> ClientID {
         ClientID {
             unique_process_id: raw_client_id.UniqueProcess,
@@ -222,28 +240,38 @@ impl ClientID {
     }
 }
 
+/// A struct representing a large integer, including low and high parts.
 pub struct LargeInteger {
     pub low_part: u32,
     pub high_part: i32,
 }
+
 impl LargeInteger {
+    /// Sets the large integer from the given LARGE_INTEGER struct.
     pub fn set(raw_large_integer: &winapi::shared::ntdef::LARGE_INTEGER) -> LargeInteger {
         unsafe {  ptr::read_unaligned(raw_large_integer as *const _ as *const LargeInteger) }
     }
+
+    /// Converts the large integer to a 64-bit unsigned integer.
     pub fn to_u64(&self) -> u64 {
         self.low_part as u64 | (self.high_part as u64) << 32
     }
+
+    /// Converts the LargeInteger struct to the LARGE_INTEGER struct used by ntapi.
     pub fn to_ntapi(&self) -> winapi::shared::ntdef::LARGE_INTEGER {
         unsafe { ptr::read_unaligned(self as *const _ as *const winapi::shared::ntdef::LARGE_INTEGER) }
     }
 }
 
+/// A struct representing a buffer, including its base address and allocation size.
 struct BufferStruct {
     base_address: *mut c_void,
     alloc_size: usize,
     with_valloc: bool,
 }
+
 impl Drop for BufferStruct {
+    /// Frees the allocated memory if valloc was used.
     fn drop(&mut self) {
         if self.with_valloc {
             if self.base_address != std::ptr::null_mut() {
@@ -252,7 +280,9 @@ impl Drop for BufferStruct {
         }
     }
 }
+
 impl BufferStruct {
+    /// Allocates memory for the buffer.
     fn alloc(size: usize) -> BufferStruct {
         BufferStruct {
             base_address: valloc(size),
@@ -260,6 +290,8 @@ impl BufferStruct {
             with_valloc: true,
         }
     }
+
+    /// Creates a buffer with the given base address and size without using valloc.
     fn with(base_address: *mut c_void, size: usize) -> BufferStruct {
         BufferStruct {
             base_address: base_address,
@@ -269,10 +301,16 @@ impl BufferStruct {
     }
 }
 
+/// A struct representing a list of processes.
 pub struct WinProcList {
     pub proc_list: Vec<ProcInfo>,
 }
 
+/// Retrieves the list of processes.
+/// 
+/// # Returns
+/// 
+/// * `Result<WinProcList, WinProcListError>` - A result containing either the WinProcList struct or a WinProcListError.
 pub fn get() -> Result<WinProcList, WinProcListError> {
     let buffer = get_system_processes_info()?;
     let list_vec = get_proc_list(buffer.base_address);
@@ -280,10 +318,28 @@ pub fn get() -> Result<WinProcList, WinProcListError> {
 }
 
 impl WinProcList {
+    /// Searches for a process by its PID.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pid` - The PID of the process to search for.
+    /// 
+    /// # Returns
+    /// 
+    /// * `Option<&ProcInfo>` - An option containing the ProcInfo struct if found.
     pub fn search_by_pid(&self, pid: u32) -> Option<&ProcInfo> {
         self.proc_list.iter().find(|&x| x.unique_process_id == pid)
     }
 
+    /// Searches for processes by their name.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The name of the processes to search for.
+    /// 
+    /// # Returns
+    /// 
+    /// * `Vec<&ProcInfo>` - A vector containing the ProcInfo structs of the processes found.
     pub fn search_by_name(&self, name: &str) -> Vec<&ProcInfo> {
         let mut vec: Vec<&ProcInfo> = Vec::new();
         for proc in self.proc_list.iter() {
@@ -294,10 +350,28 @@ impl WinProcList {
         vec
     }
 
+    /// Gets the name of a process by its PID.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pid` - The PID of the process.
+    /// 
+    /// # Returns
+    /// 
+    /// * `Option<&String>` - An option containing the name of the process if found.
     pub fn get_name_by_pid(&self, pid: u32) -> Option<&String> {
         self.proc_list.iter().find(|&x| x.unique_process_id == pid).map(|x| &x.image_name)
     }
 
+    /// Gets the PIDs of processes by their name.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `name` - The name of the processes.
+    /// 
+    /// # Returns
+    /// 
+    /// * `Option<Vec<u32>>` - An option containing a vector of PIDs of the processes found.
     pub fn get_pids_by_name(&self, name: &str) -> Option<Vec<u32>> {
         let mut vec: Vec<u32> = Vec::new();
         for proc in self.proc_list.iter() {
@@ -314,6 +388,15 @@ impl WinProcList {
     }
 }
 
+/// Retrieves the information of a process by its PID.
+/// 
+/// # Arguments
+/// 
+/// * `pid` - The PID of the process.
+/// 
+/// # Returns
+/// 
+/// * `Result<Option<ProcInfo>, WinProcListError>` - A result containing either an option with the ProcInfo struct or a WinProcListError.
 pub fn get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcListError> {
     let buffer = get_system_processes_info()?;
     let mut next_address = buffer.base_address as isize;
@@ -338,14 +421,14 @@ pub fn get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcListErr
     Ok(None)
 }
 
-// 現在動作中のすべてのプロセス情報を取得
-// SystemProcessInformation を buffer に取得
+/// Retrieves the information of all currently running processes.
+/// 
+/// This function queries the system for process information and stores it in a buffer.
+/// 
+/// # Returns
+/// 
+/// * `Result<BufferStruct, WinProcListError>` - A result containing either the BufferStruct with process information or a WinProcListError.
 fn get_system_processes_info() -> Result<BufferStruct, WinProcListError> {
-    // プロセス情報を取得
-    // SystemProcessInformation : 各プロセスの情報（オプション定数）
-    // base_address             : 格納先
-    // buffer_size              : 格納先のサイズ
-    // &mut buffer_size         : 実際に取得したサイズ
     let mut buffer_size: u32 = 1024;
     let mut status;
     loop {
@@ -364,6 +447,15 @@ fn get_system_processes_info() -> Result<BufferStruct, WinProcListError> {
     }
 }
 
+/// Retrieves a list of process information from the given base address.
+/// 
+/// # Arguments
+/// 
+/// * `base_address` - The base address from which to retrieve process information.
+/// 
+/// # Returns
+/// 
+/// * `Vec<ProcInfo>` - A vector containing the information of all processes.
 fn get_proc_list(base_address: *mut c_void) -> Vec<ProcInfo> {
     let mut next_address = base_address as isize;
     let mut proc_list: Vec<ProcInfo> = Vec::new();
@@ -383,7 +475,15 @@ fn get_proc_list(base_address: *mut c_void) -> Vec<ProcInfo> {
     proc_list
 }
 
-// プロセス一つ分の情報を取得
+/// Retrieves the information of a single process from the given address.
+/// 
+/// # Arguments
+/// 
+/// * `next_address` - The address from which to retrieve the process information.
+/// 
+/// # Returns
+/// 
+/// * `BufferStruct` - A buffer containing the process information.
 fn read_proc_info(next_address: *mut c_void) -> BufferStruct {
     let next_entry_offset = unsafe { (next_address as *const SYSTEM_PROCESS_INFORMATION).read().NextEntryOffset };
     
@@ -392,23 +492,48 @@ fn read_proc_info(next_address: *mut c_void) -> BufferStruct {
         return system_process_info_buffer;
     }
 
-    // base_address の該当オフセット値から SYSTEM_PROCESS_INFORMATION 構造体の情報をプロセス1つ分取得
     system_process_info_buffer.base_address = next_address;
     system_process_info_buffer
 }
 
+/// Reads a string from memory.
+/// 
+/// # Arguments
+/// 
+/// * `base_address` - The base address from which to read the string.
+/// * `offset` - The offset from the base address.
+/// * `size` - The size of the string.
+/// 
+/// # Returns
+/// 
+/// * `String` - The string read from memory.
 fn get_str_from_mem(base_address: *mut c_void, offset: usize, size: usize) -> String {
     let mut vec: Vec<u16> = vec![0; size];
     read_process_memory((base_address as usize + offset) as *mut c_void, vec.as_mut_ptr() as *mut c_void, size);
     String::from_utf16_lossy(&vec).trim_matches(char::from(0)).to_string()
 }
 
+/// Allocates memory for a buffer.
+/// 
+/// # Arguments
+/// 
+/// * `buffer_size` - The size of the buffer to allocate.
+/// 
+/// # Returns
+/// 
+/// * `*mut c_void` - A pointer to the allocated memory.
 fn valloc(buffer_size: usize) -> *mut c_void {
     unsafe {
         VirtualAlloc(std::ptr::null_mut(), buffer_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
     }
 }
 
+/// Frees the allocated memory.
+/// 
+/// # Arguments
+/// 
+/// * `addr` - The address of the memory to free.
+/// * `buffer_size` - The size of the memory to free.
 fn vfree(addr: *mut c_void, buffer_size: usize) {
     if addr != std::ptr::null_mut() {
         unsafe {
@@ -417,6 +542,13 @@ fn vfree(addr: *mut c_void, buffer_size: usize) {
     }
 }
 
+/// Reads the memory of a process.
+/// 
+/// # Arguments
+/// 
+/// * `base_address` - The base address from which to read.
+/// * `buffer` - The buffer to store the read data.
+/// * `buffer_size` - The size of the buffer.
 fn read_process_memory(base_address: *mut c_void, buffer: *mut c_void, buffer_size: usize) {
     unsafe {
         ReadProcessMemory(
