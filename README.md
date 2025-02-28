@@ -134,8 +134,8 @@ fn main() {
 use winprocinfo;
 
 fn main() {
-    let pid = 1234; // PID of the process to retrieve
-    if let Ok(Some(proc_info)) = get_proc_info_by_pid(pid) {
+    let pid = std::process::id();   // Get PID of current process
+    if let Ok(Some(proc_info)) = winprocinfo::get_proc_info_by_pid(pid) {
         println!("Found process: {} (PID: {})", proc_info.image_name, proc_info.unique_process_id);
     } else {
         println!("Process with PID {} not found", pid);
