@@ -1,13 +1,16 @@
 [package]
-name = "winproclist"
+name = "winprocinfo"
 version = "0.1.0"
 authors = ["yotio <yotio@yotiosoft.com>"]
 description = "A Rust library that utilizes Windows API to retrieve information about processes and threads within the system."
 license = "MIT OR Apache-2.0"
 edition = "2021"
-repository = "https://github.com/yotiosoft/winproclist"
+repository = "https://github.com/yotiosoft/winprocinfo"
 categories = ["Operating systems", "Windows APIs", "API bindings"]
-documentation = "https://docs.rs/winproclist"
+documentation = "https://docs.rs/winprocinfo"
+
+[package.metadata.docs.rs]
+default-target = "x86_64-pc-windows-msvc"
 
 [dependencies]
 ntapi = "0.4.1"

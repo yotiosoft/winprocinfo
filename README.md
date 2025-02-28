@@ -1,21 +1,21 @@
-# WinProcList Library
+# WinProcInfo Library
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 ![crates.io](https://img.shields.io/badge/crates.io-v0.1.0-brightgreen.svg)
 
 ## Overview
-WinProcList is a Rust library that utilizes Windows API to retrieve information about processes and threads within the system. This library provides two methods for obtaining process information: batch retrieval of process information and retrieval of specific process information.
+WinProcInfo is a Rust library that utilizes Windows API to retrieve information about processes and threads within the system. This library provides two methods for obtaining process information: batch retrieval of process information and retrieval of specific process information.
 
 ## Methods for Retrieving Process Information
 
 1. **Retrieving information of all processes and threads**
-   - Use `winproclist::get()` to retrieve information on all processes and threads at once.
+   - Use `winprocinfo::get()` to retrieve information on all processes and threads at once.
    - Within the retrieved `WinProcList`, it is possible to search by process name or PID.
    - Effective when you want to retrieve multiple process information at once.
 
 2. **Retrieving only specific process information**
-   - Use `get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcListError>` to retrieve only the process information corresponding to the specified PID.
+   - Use `get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcInfoError>` to retrieve only the process information corresponding to the specified PID.
    - Effective when you want to retrieve information for a few processes while conserving memory usage.
 
 ## `ProcInfo` Structure
@@ -119,10 +119,10 @@ pub struct ClientID {
 ## Sample Code
 ### Example: Retrieving all process information
 ```rust
-use winproclist::WinProcList;
+use winprocinfo;
 
 fn main() {
-    let proc_list = winproclist::get().expect("Failed to retrieve process list");
+    let proc_list = winprocinfo::get().expect("Failed to retrieve process list");
     for proc in proc_list.proc_list.iter() {
         println!("PID: {}, Name: {}", proc.unique_process_id, proc.image_name);
     }
@@ -131,7 +131,7 @@ fn main() {
 
 ### Example: Retrieving specific process information
 ```rust
-use winproclist::get_proc_info_by_pid;
+use winprocinfo;
 
 fn main() {
     let pid = 1234; // PID of the process to retrieve
@@ -146,10 +146,10 @@ fn main() {
 
 ### Example: Searching for a process by name
 ```rust
-use winproclist::WinProcList;
+use winprocinfo;
 
 fn main() {
-    let proc_list = winproclist::get().expect("Failed to retrieve process list");
+    let proc_list = winprocinfo::get().expect("Failed to retrieve process list");
     let process_name = "cargo.exe";
     println!("\nSearch by process name: {}", process_name);
     let procs = proc_list.search_by_name(process_name);
@@ -167,7 +167,7 @@ fn main() {
 ### All sample code
 Print all process and thread information, search by PID, search by process name, get PID by process name, get process name by PID, and get process info by PID.
 ```rust
-use winproclist;
+use winprocinfo;
 
 fn print_proc_header() {
     println!("{:<25} {:<10} {:<10} {:<10} {:<15} {:<15} {:<15} {:<10} {:<10}",
@@ -180,7 +180,7 @@ fn print_thread_header() {
     println!("    {:-<121}", "");
 }
 
-fn print_proc_info(proc: &winproclist::ProcInfo) {
+fn print_proc_info(proc: &winprocinfo::ProcInfo) {
     print_proc_header();
     println!("{:<25} {:<10} {:<10} {:<10} {:<15} {:<15} {:<15} {:<10} {:<10}",
         proc.image_name,
@@ -212,7 +212,7 @@ fn print_proc_info(proc: &winproclist::ProcInfo) {
 }
 
 fn main() -> Result<(), String> {
-    let win_proc_list = winproclist::get().map_err(|e| e.to_string())?;
+    let win_proc_list = winprocinfo::get().map_err(|e| e.to_string())?;
     
     for proc in win_proc_list.proc_list.iter() {
         print_proc_info(proc);
@@ -266,7 +266,7 @@ fn main() -> Result<(), String> {
     println!("\n{:=<125}", "");
     
     println!("\nGet process info by PID: {}", pid);
-    if let Some(proc) = winproclist::get_proc_info_by_pid(pid).map_err(|e| e.to_string())? {
+    if let Some(proc) = winprocinfo::get_proc_info_by_pid(pid).map_err(|e| e.to_string())? {
         print_proc_info(&proc);
     } else {
         println!("Process not found.");

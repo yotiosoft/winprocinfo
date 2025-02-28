@@ -1,4 +1,4 @@
-use winproclist;
+use winprocinfo;
 
 fn print_proc_header() {
     println!("{:<25} {:<10} {:<10} {:<10} {:<15} {:<15} {:<15} {:<10} {:<10}",
@@ -11,7 +11,7 @@ fn print_thread_header() {
     println!("    {:-<121}", "");
 }
 
-fn print_proc_info(proc: &winproclist::ProcInfo) {
+fn print_proc_info(proc: &winprocinfo::ProcInfo) {
     print_proc_header();
     println!("{:<25} {:<10} {:<10} {:<10} {:<15} {:<15} {:<15} {:<10} {:<10}",
         proc.image_name,
@@ -43,7 +43,7 @@ fn print_proc_info(proc: &winproclist::ProcInfo) {
 }
 
 fn main() -> Result<(), String> {
-    let win_proc_list = winproclist::get().map_err(|e| e.to_string())?;
+    let win_proc_list = winprocinfo::get().map_err(|e| e.to_string())?;
     
     for proc in win_proc_list.proc_list.iter() {
         print_proc_info(proc);
@@ -97,7 +97,7 @@ fn main() -> Result<(), String> {
     println!("\n{:=<125}", "");
     
     println!("\nGet process info by PID: {}", pid);
-    if let Some(proc) = winproclist::get_proc_info_by_pid(pid).map_err(|e| e.to_string())? {
+    if let Some(proc) = winprocinfo::get_proc_info_by_pid(pid).map_err(|e| e.to_string())? {
         print_proc_info(&proc);
     } else {
         println!("Process not found.");
