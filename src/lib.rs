@@ -69,7 +69,7 @@ pub struct ProcInfo {
 
 impl ProcInfo {
     /// Sets the process information from the given raw process information buffer.
-    fn set(raw_proc_info_buffer: &BufferStruct) -> ProcInfo {
+    fn from(raw_proc_info_buffer: &BufferStruct) -> ProcInfo {
         let raw_proc_info = raw_proc_info_buffer.base_address as *const SYSTEM_PROCESS_INFORMATION;
         let raw_proc_info = unsafe { *raw_proc_info };
 
@@ -89,13 +89,13 @@ impl ProcInfo {
             peak_pagefile_usage: raw_proc_info.PeakPagefileUsage,
             private_page_count: raw_proc_info.PrivatePageCount,
             number_of_threads: raw_proc_info.NumberOfThreads,
-            working_set_private_size: LargeInteger::set(&raw_proc_info.WorkingSetPrivateSize),
+            working_set_private_size: LargeInteger::from(&raw_proc_info.WorkingSetPrivateSize),
             hard_fault_count: raw_proc_info.HardFaultCount,
             number_of_threads_high_watermark: raw_proc_info.NumberOfThreadsHighWatermark,
             cycle_time: raw_proc_info.CycleTime,
-            create_time: LargeInteger::set(&raw_proc_info.CreateTime),
-            user_time: LargeInteger::set(&raw_proc_info.UserTime),
-            kernel_time: LargeInteger::set(&raw_proc_info.KernelTime),
+            create_time: LargeInteger::from(&raw_proc_info.CreateTime),
+            user_time: LargeInteger::from(&raw_proc_info.UserTime),
+            kernel_time: LargeInteger::from(&raw_proc_info.KernelTime),
             base_priority: raw_proc_info.BasePriority,
             inherited_from_unique_process_id: raw_proc_info.InheritedFromUniqueProcessId,
             unique_process_key: raw_proc_info.UniqueProcessKey,
@@ -103,12 +103,12 @@ impl ProcInfo {
             working_set_size: raw_proc_info.WorkingSetSize,
             quota_peak_paged_pool_usage: raw_proc_info.QuotaPeakPagedPoolUsage,
             quota_peak_non_paged_pool_usage: raw_proc_info.QuotaPeakNonPagedPoolUsage,
-            read_operation_count: LargeInteger::set(&raw_proc_info.ReadOperationCount),
-            write_operation_count: LargeInteger::set(&raw_proc_info.WriteOperationCount),
-            other_operation_count: LargeInteger::set(&raw_proc_info.OtherOperationCount),
-            read_transfer_count: LargeInteger::set(&raw_proc_info.ReadTransferCount),
-            write_transfer_count: LargeInteger::set(&raw_proc_info.WriteTransferCount),
-            other_transfer_count: LargeInteger::set(&raw_proc_info.OtherTransferCount),
+            read_operation_count: LargeInteger::from(&raw_proc_info.ReadOperationCount),
+            write_operation_count: LargeInteger::from(&raw_proc_info.WriteOperationCount),
+            other_operation_count: LargeInteger::from(&raw_proc_info.OtherOperationCount),
+            read_transfer_count: LargeInteger::from(&raw_proc_info.ReadTransferCount),
+            write_transfer_count: LargeInteger::from(&raw_proc_info.WriteTransferCount),
+            other_transfer_count: LargeInteger::from(&raw_proc_info.OtherTransferCount),
             threads: get_thread_info_vec(&raw_proc_info_buffer, number_of_threads),
         }
     }
@@ -118,9 +118,13 @@ impl ProcInfo {
         SYSTEM_PROCESS_INFORMATION {
             NextEntryOffset: self.next_entry_offset,
             ImageName: UNICODE_STRING {
-                Length: self.image_name.len() as u16,
-                MaximumLength: self.image_name.len() as u16,
-                Buffer: self.image_name.as_ptr() as *mut u16,
+                Length: self.image_name.len() as u16 * 2,
+                MaximumLength: self.image_name.len() as u16 * 2,
+                Buffer: {
+                    let mut buffer: Vec<u16> = self.image_name.encode_utf16().collect();
+                    buffer.push(0);
+                    buffer.as_mut_ptr()
+                }
             },
             UniqueProcessId: self.unique_process_id as *mut c_void,
             HandleCount: self.handle_count,
@@ -177,11 +181,11 @@ pub struct ThreadInfo {
 
 impl ThreadInfo {
     /// Sets the thread information from the given SYSTEM_THREAD_INFORMATION.
-    pub fn set(thread_info: &SYSTEM_THREAD_INFORMATION) -> ThreadInfo {
+    pub fn from(thread_info: &SYSTEM_THREAD_INFORMATION) -> ThreadInfo {
         ThreadInfo {
-            kernel_time: LargeInteger::set(&thread_info.KernelTime),
-            user_time: LargeInteger::set(&thread_info.UserTime),
-            create_time: LargeInteger::set(&thread_info.CreateTime),
+            kernel_time: LargeInteger::from(&thread_info.KernelTime),
+            user_time: LargeInteger::from(&thread_info.UserTime),
+            create_time: LargeInteger::from(&thread_info.CreateTime),
             wait_time: thread_info.WaitTime,
             start_address: thread_info.StartAddress,
             priority: thread_info.Priority,
@@ -189,7 +193,7 @@ impl ThreadInfo {
             context_switches: thread_info.ContextSwitches,
             thread_state: thread_info.ThreadState,
             wait_reason: thread_info.WaitReason,
-            client_id: ClientID::set(&thread_info.ClientId),
+            client_id: ClientID::from(&thread_info.ClientId),
         }
     }
 
@@ -220,7 +224,7 @@ fn get_thread_info_vec(proc_info_buffer: &BufferStruct, number_of_threads: u32) 
     unsafe { 
         std::slice::from_raw_parts(thread_array_base as *const SYSTEM_THREAD_INFORMATION, number_of_threads as usize)
             .iter()
-            .map(|x| ThreadInfo::set(x)).collect() 
+            .map(|x| ThreadInfo::from(x)).collect() 
     }
 }
 
@@ -232,7 +236,7 @@ pub struct ClientID {
 
 impl ClientID {
     /// Sets the client ID from the given CLIENT_ID struct.
-    pub fn set(raw_client_id: &ntapi::ntapi_base::CLIENT_ID) -> ClientID {
+    pub fn from(raw_client_id: &ntapi::ntapi_base::CLIENT_ID) -> ClientID {
         ClientID {
             unique_process_id: raw_client_id.UniqueProcess,
             unique_thread_id: raw_client_id.UniqueThread,
@@ -248,7 +252,7 @@ pub struct LargeInteger {
 
 impl LargeInteger {
     /// Sets the large integer from the given LARGE_INTEGER struct.
-    pub fn set(raw_large_integer: &winapi::shared::ntdef::LARGE_INTEGER) -> LargeInteger {
+    pub fn from(raw_large_integer: &winapi::shared::ntdef::LARGE_INTEGER) -> LargeInteger {
         unsafe {  ptr::read_unaligned(raw_large_integer as *const _ as *const LargeInteger) }
     }
 
@@ -413,7 +417,7 @@ pub fn get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcListErr
             continue;
         }
 
-        let proc_info: ProcInfo = ProcInfo::set(&system_process_information_buffer);
+        let proc_info: ProcInfo = ProcInfo::from(&system_process_information_buffer);
 
         return Ok(Some(proc_info));
     }
@@ -462,7 +466,7 @@ fn get_proc_list(base_address: *mut c_void) -> Vec<ProcInfo> {
 
     loop {
         let system_process_information_buffer = read_proc_info(next_address as *mut c_void);
-        let proc_info: ProcInfo = ProcInfo::set(&system_process_information_buffer);
+        let proc_info: ProcInfo = ProcInfo::from(&system_process_information_buffer);
         proc_list.push(proc_info);
 
         if system_process_information_buffer.alloc_size == 0 {
