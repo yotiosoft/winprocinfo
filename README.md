@@ -85,6 +85,37 @@ pub struct ThreadInfo {
 
 Each member variable corresponds to the member variables of the SYSTEM_THREAD_INFORMATION structure in the ntapi crate.
 
+## `LargeInteger` Structure
+
+`LargeInteger` is a structure that holds a 64-bit signed integer value.
+
+```rust
+pub struct LargeInteger {
+    pub low_part: u32,
+    pub high_part: i32,
+}
+```
+This structure provides a method to convert the 64-bit signed integer value to a u64 value.
+
+```rust
+impl LargeInteger {
+    pub fn to_u64(&self) -> u64 {
+        self.low_part as u64 | (self.high_part as u64) << 32
+    }
+}
+```
+
+## `ClientID` Structure
+
+`ClientID` is a structure that holds the unique thread ID and process ID.
+
+```rust
+pub struct ClientID {
+    pub unique_thread_id: usize,
+    pub unique_process_id: usize,
+}
+```
+
 ## Sample Code
 ### Example: Retrieving all process information
 ```rust
