@@ -62,14 +62,17 @@ fn main() -> Result<(), String> {
 
     println!("\n{:=<125}", "");
     
-    let name = "winproclist.exe";
+    let name = std::env::current_exe().map_err(|e| e.to_string())?;
+    let name = name.file_name().ok_or("Invalid file name.")?.to_str().ok_or("Invalid file name.")?;
     println!("\nSearch by process name: {}", name);
-    if let Some(procs) = win_proc_list.search_by_name(name) {
+    let procs = win_proc_list.search_by_name(name);
+    if procs.is_empty() {
+        println!("Process not found.");
+    }
+    else {
         for proc in procs.iter() {
             print_proc_info(proc);
         }
-    } else {
-        println!("Process not found.");
     }
 
     println!("\n{:=<125}", "");

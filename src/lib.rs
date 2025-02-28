@@ -1,4 +1,5 @@
 use std::fmt::{Debug, Display};
+use std::ptr;
 use winapi::ctypes::*;
 use winapi::um::memoryapi::*;
 use winapi::um::processthreadsapi::*;
@@ -200,13 +201,11 @@ impl ThreadInfo {
 
 fn get_thread_info_vec(proc_info_buffer: &BufferStruct, number_of_threads: u32) -> Vec<ThreadInfo> {
     let thread_array_base = proc_info_buffer.base_address as usize + std::mem::size_of::<SYSTEM_PROCESS_INFORMATION>() - std::mem::size_of::<SYSTEM_THREAD_INFORMATION>();
-    let mut thread_info_vec: Vec<ThreadInfo> = Vec::new();
-    for i in 0..number_of_threads as usize {
-        let thread_info_ptr = (thread_array_base + i * std::mem::size_of::<SYSTEM_THREAD_INFORMATION>()) as *const SYSTEM_THREAD_INFORMATION;
-        let thread_info = unsafe { *thread_info_ptr };
-        let thread_info = ThreadInfo::set(&thread_info);
-        thread_info_vec.push(thread_info);
-    }
+    let mut thread_info_vec: Vec<ThreadInfo> = unsafe { 
+        std::slice::from_raw_parts(thread_array_base as *const SYSTEM_THREAD_INFORMATION, number_of_threads as usize)
+            .iter()
+            .map(|x| ThreadInfo::set(x)).collect() 
+    };
     thread_info_vec
 }
 
@@ -229,20 +228,13 @@ pub struct LargeInteger {
 }
 impl LargeInteger {
     pub fn set(raw_large_integer: &winapi::shared::ntdef::LARGE_INTEGER) -> LargeInteger {
-        let mut large_integer = LargeInteger {
-            low_part: 0,
-            high_part: 0,
-        };
-        read_process_memory(raw_large_integer as *const _ as *mut c_void, &mut large_integer as *mut _ as *mut c_void, std::mem::size_of::<LargeInteger>());
-        large_integer
+        unsafe {  ptr::read_unaligned(raw_large_integer as *const _ as *const LargeInteger) }
     }
     pub fn to_u64(&self) -> u64 {
         self.low_part as u64 | (self.high_part as u64) << 32
     }
     pub fn to_ntapi(&self) -> winapi::shared::ntdef::LARGE_INTEGER {
-        let mut large_integer: winapi::shared::ntdef::LARGE_INTEGER = unsafe { std::mem::zeroed() };
-        read_process_memory(self as *const _ as *mut c_void, &mut large_integer as *mut _ as *mut c_void, std::mem::size_of::<LargeInteger>());
-        large_integer
+        unsafe { ptr::read_unaligned(self as *const _ as *const winapi::shared::ntdef::LARGE_INTEGER) }
     }
 }
 
@@ -254,7 +246,9 @@ struct BufferStruct {
 impl Drop for BufferStruct {
     fn drop(&mut self) {
         if self.with_valloc {
-            vfree(self.base_address, self.alloc_size);
+            if self.base_address != std::ptr::null_mut() {
+                vfree(self.base_address, self.alloc_size);
+            }
         }
     }
 }
@@ -290,19 +284,14 @@ impl WinProcList {
         self.proc_list.iter().find(|&x| x.unique_process_id == pid)
     }
 
-    pub fn search_by_name(&self, name: &str) -> Option<Vec<&ProcInfo>> {
+    pub fn search_by_name(&self, name: &str) -> Vec<&ProcInfo> {
         let mut vec: Vec<&ProcInfo> = Vec::new();
         for proc in self.proc_list.iter() {
             if proc.image_name == name {
                 vec.push(proc);
             }
         }
-        if vec.is_empty() {
-            None
-        }
-        else {
-            Some(vec)
-        }
+        vec
     }
 
     pub fn get_name_by_pid(&self, pid: u32) -> Option<&String> {
