@@ -5,7 +5,7 @@
 ![crates.io](https://img.shields.io/badge/crates.io-v0.1.0-brightgreen.svg)
 
 ## Overview
-WinProcInfo is a Rust library that utilizes Windows API to retrieve information about processes and threads within the system. This library provides two methods for obtaining process information: batch retrieval of process information and retrieval of specific process information.
+WinProcInfo is a Rust library that utilizes Windows API to obtain information about processes and threads in a Windows system. This library provides two methods for obtaining process information: batch retrieval of process information and retrieval of specific process information.
 
 ## Methods for Retrieving Process Information
 
