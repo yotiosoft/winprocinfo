@@ -28,7 +28,7 @@ impl Display for WinProcInfoError {
 }
 
 /// A struct representing the information of a process.
-/// Each member variable corresponds to the member variables of the SYSTEM_PROCESS_INFORMATION structure in the ntapi crate.
+/// Each member variable corresponds to the member variables of the ``SYSTEM_PROCESS_INFORMATION`` structure in the ntapi crate.
 pub struct ProcInfo {
     pub next_entry_offset: u32,
     pub image_name: String,
@@ -113,7 +113,7 @@ impl ProcInfo {
         }
     }
 
-    /// Converts the ProcInfo struct to the SYSTEM_PROCESS_INFORMATION struct used by ntapi.
+    /// Converts the ProcInfo struct to the ``SYSTEM_PROCESS_INFORMATION`` struct used by ntapi.
     pub fn to_ntapi(&self) -> SYSTEM_PROCESS_INFORMATION {
         SYSTEM_PROCESS_INFORMATION {
             NextEntryOffset: self.next_entry_offset,
@@ -164,7 +164,7 @@ impl ProcInfo {
 }
 
 /// A struct representing the information of a thread.
-/// Each member variable corresponds to the member variables of the SYSTEM_THREAD_INFORMATION structure in the ntapi crate.
+/// Each member variable corresponds to the member variables of the ``SYSTEM_THREAD_INFORMATION`` structure in the ntapi crate.
 pub struct ThreadInfo {
     pub kernel_time: LargeInteger,
     pub user_time: LargeInteger,
@@ -180,7 +180,7 @@ pub struct ThreadInfo {
 }
 
 impl ThreadInfo {
-    /// Sets the thread information from the given SYSTEM_THREAD_INFORMATION.
+    /// Sets the thread information from the given ``SYSTEM_THREAD_INFORMATION``.
     pub fn from(thread_info: &SYSTEM_THREAD_INFORMATION) -> ThreadInfo {
         ThreadInfo {
             kernel_time: LargeInteger::from(&thread_info.KernelTime),
@@ -197,7 +197,7 @@ impl ThreadInfo {
         }
     }
 
-    /// Converts the ThreadInfo struct to the SYSTEM_THREAD_INFORMATION struct used by ntapi.
+    /// Converts the ThreadInfo struct to the ``SYSTEM_THREAD_INFORMATION`` struct used by ntapi.
     pub fn to_ntapi(&self) -> SYSTEM_THREAD_INFORMATION {
         SYSTEM_THREAD_INFORMATION {
             KernelTime: self.kernel_time.to_ntapi(),
@@ -315,6 +315,18 @@ pub struct WinProcList {
 /// # Returns
 /// 
 /// * `Result<WinProcList, WinProcInfoError>` - A result containing either the WinProcList struct or a WinProcInfoError.
+/// 
+/// # Example
+/// 
+/// ```rust
+/// use winprocinfo;
+/// 
+/// let win_proc_list = winprocinfo::get_list().unwrap();
+/// for proc in win_proc_list.proc_list.iter() {
+///     println!("Image Name: {}", proc.image_name);
+///     println!("PID: {}", proc.unique_process_id);
+/// }
+/// ```
 pub fn get_list() -> Result<WinProcList, WinProcInfoError> {
     let buffer = get_system_processes_info()?;
     let list_vec = get_proc_list(buffer.base_address);
@@ -331,6 +343,19 @@ impl WinProcList {
     /// # Returns
     /// 
     /// * `Option<&ProcInfo>` - An option containing the ProcInfo struct if found.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use winprocinfo;
+    /// 
+    /// let win_proc_list = winprocinfo::get_list().unwrap();
+    /// let pid = std::process::id();
+    /// if let Some(proc) = win_proc_list.search_by_pid(pid) {
+    ///     println!("Image Name: {}", proc.image_name);
+    ///     println!("PID: {}", proc.unique_process_id);
+    /// }
+    /// ```
     pub fn search_by_pid(&self, pid: u32) -> Option<&ProcInfo> {
         self.proc_list.iter().find(|&x| x.unique_process_id == pid)
     }
@@ -344,6 +369,21 @@ impl WinProcList {
     /// # Returns
     /// 
     /// * `Vec<&ProcInfo>` - A vector containing the ProcInfo structs of the processes found.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use winprocinfo;
+    /// 
+    /// let win_proc_list = winprocinfo::get_list().unwrap();
+    /// let binding = std::env::current_exe().unwrap();
+    /// let name = binding.file_name().unwrap().to_str().unwrap();
+    /// let procs = win_proc_list.search_by_name(name);
+    /// for proc in procs.iter() {
+    ///     println!("Image Name: {}", proc.image_name);
+    ///     println!("PID: {}", proc.unique_process_id);
+    /// }
+    /// ```
     pub fn search_by_name(&self, name: &str) -> Vec<&ProcInfo> {
         let mut vec: Vec<&ProcInfo> = Vec::new();
         for proc in self.proc_list.iter() {
@@ -363,6 +403,18 @@ impl WinProcList {
     /// # Returns
     /// 
     /// * `Option<&String>` - An option containing the name of the process if found.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use winprocinfo;
+    /// 
+    /// let win_proc_list = winprocinfo::get_list().unwrap();
+    /// let pid = std::process::id();
+    /// if let Some(name) = win_proc_list.get_name_by_pid(pid) {
+    ///    println!("Process Name: {}", name);
+    /// }
+    /// ```
     pub fn get_name_by_pid(&self, pid: u32) -> Option<&String> {
         self.proc_list.iter().find(|&x| x.unique_process_id == pid).map(|x| &x.image_name)
     }
@@ -376,6 +428,21 @@ impl WinProcList {
     /// # Returns
     /// 
     /// * `Option<Vec<u32>>` - An option containing a vector of PIDs of the processes found.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use winprocinfo;
+    /// 
+    /// let win_proc_list = winprocinfo::get_list().unwrap();
+    /// let binding = std::env::current_exe().unwrap();
+    /// let name = binding.file_name().unwrap().to_str().unwrap();
+    /// if let Some(pids) = win_proc_list.get_pids_by_name(name) {
+    ///     for pid in pids.iter() {
+    ///         println!("PID: {}", pid);
+    ///     }
+    /// }
+    /// ```
     pub fn get_pids_by_name(&self, name: &str) -> Option<Vec<u32>> {
         let mut vec: Vec<u32> = Vec::new();
         for proc in self.proc_list.iter() {
@@ -401,6 +468,18 @@ impl WinProcList {
 /// # Returns
 /// 
 /// * `Result<Option<ProcInfo>, WinProcInfoError>` - A result containing either an option with the ProcInfo struct or a WinProcInfoError.
+/// 
+/// # Example
+/// 
+/// ```rust
+/// use winprocinfo;
+/// 
+/// let pid = std::process::id();
+/// if let Some(proc) = winprocinfo::get_proc_info_by_pid(pid).unwrap() {
+///     println!("Image Name: {}", proc.image_name);
+///     println!("PID: {}", proc.unique_process_id);
+/// }
+/// ```
 pub fn get_proc_info_by_pid(pid: u32) -> Result<Option<ProcInfo>, WinProcInfoError> {
     let buffer = get_system_processes_info()?;
     let mut next_address = buffer.base_address as isize;
