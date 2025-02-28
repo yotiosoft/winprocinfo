@@ -6,7 +6,7 @@ description = "A Rust library that utilizes Windows API to obtain information ab
 license = "MIT OR Apache-2.0"
 edition = "2024"
 repository = "https://github.com/yotiosoft/winprocinfo"
-categories = ["Operating systems", "Windows APIs", "API bindings"]
+categories = ["os", "os::windows-apis", "api-bindings"]
 documentation = "https://docs.rs/winprocinfo"
 
 [dependencies]
