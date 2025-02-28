@@ -7,6 +7,20 @@
 ## Overview
 WinProcInfo is a Rust library that utilizes Windows API to obtain information about processes and threads in a Windows system. This library provides two methods for obtaining process information: batch retrieval of process information and retrieval of specific process information.
 
+```
+Get process info by PID: 61448
+ImageName                 PID        Handles    SessionId  VirtualSize     PagefileUsage   PrivatePages    Priority   Threads   
+-----------------------------------------------------------------------------------------------------------------------------
+winprocinfo.exe           61448      51         1          4352143360      4370432         4370432         8          4
+    TID        KernelTime      UserTime        CreateTime           WaitTime   ContextSwitches Priority
+    -------------------------------------------------------------------------------------------------------------------------
+    58932      1875000         1250000         133852326736529062   11023067   47474           8
+    2512       0               0               133852326736590773   11022920   1               8
+    60580      0               0               133852326736591977   11022920   2               8
+    62668      0               0               133852326736593462   11022920   1               8
+-----------------------------------------------------------------------------------------------------------------------------
+```
+
 ## Methods for Retrieving Process Information
 
 1. **Retrieving information of all processes and threads**
