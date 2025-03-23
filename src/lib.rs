@@ -394,6 +394,43 @@ impl WinProcList {
         vec
     }
 
+    /// Searches for processes by a pattern in their name.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pattern` - The pattern to search for in the process names.
+    /// 
+    /// # Returns
+    /// 
+    /// * `Vec<&ProcInfo>` - A vector containing the ProcInfo structs of the processes found.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use winprocinfo;
+    /// 
+    /// let win_proc_list = winprocinfo::get_list().unwrap();
+    /// let pattern = "winprocinfo*";
+    /// let procs = win_proc_list.search_by_pattern(pattern);
+    /// for proc in procs.iter() {
+    ///     println!("Image Name: {}", proc.image_name);
+    ///     println!("PID: {}", proc.unique_process_id);
+    /// }
+    /// ```
+    pub fn search_by_pattern(&self, pattern: &str) -> Vec<&ProcInfo> {
+        use regex::Regex;
+
+        let regex = match Regex::new(pattern) {
+            Ok(re) => re,
+            Err(_) => return Vec::new(), // 不正な正規表現は空の結果を返す
+        };
+    
+        self.proc_list
+            .iter()
+            .filter(|proc| regex.is_match(&proc.image_name))
+            .collect()
+    }
+
     /// Gets the name of a process by its PID.
     /// 
     /// # Arguments

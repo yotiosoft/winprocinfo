@@ -23,6 +23,18 @@ winprocinfo.exe           61448      51         1          4352143360      43704
 -----------------------------------------------------------------------------------------------------------------------------
 ```
 
+## Installation
+Add the following to your `Cargo.toml` file.
+```toml
+[dependencies]
+winprocinfo = "0.1.1"
+```
+
+Or, you can use ``cargo`` to add the library to your project.
+```sh
+cargo add winprocinfo
+```
+
 ## Methods for Retrieving Process Information
 
 1. **Retrieving information of all processes and threads**
@@ -70,6 +82,26 @@ fn main() {
     let process_name = "cargo.exe";
     println!("\nSearch by process name: {}", process_name);
     let procs = proc_list.search_by_name(process_name);
+    if procs.is_empty() {
+        println!("Process not found.");
+    }
+    else {
+        for proc in procs.iter() {
+            println!("PID: {}, Name: {}", proc.unique_process_id, proc.image_name);
+        }
+    }
+}
+```
+
+### Example: Searching for a process by name pattern
+```rust
+use winprocinfo;
+
+fn main() {
+    let proc_list = winprocinfo::get_list().expect("Failed to retrieve process list");
+    let process_name = "win*";
+    println!("\nSearch by process name pattern: {}", process_name);
+    let procs = proc_list.search_by_pattern(process_name);
     if procs.is_empty() {
         println!("Process not found.");
     }

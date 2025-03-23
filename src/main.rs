@@ -45,12 +45,14 @@ fn print_proc_info(proc: &winprocinfo::ProcInfo) {
 fn main() -> Result<(), String> {
     let win_proc_list = winprocinfo::get_list().map_err(|e| e.to_string())?;
     
+    // Print all processes
     for proc in win_proc_list.proc_list.iter() {
         print_proc_info(proc);
     }
 
     println!("\n{:=<125}", "");
     
+    // Search by PID
     let pid = std::process::id();
     println!("\nSearch by this process id: {}", pid);
     if let Some(proc) = win_proc_list.search_by_pid(pid) {
@@ -61,6 +63,7 @@ fn main() -> Result<(), String> {
 
     println!("\n{:=<125}", "");
     
+    // Search by process name
     let name = std::env::current_exe().map_err(|e| e.to_string())?;
     let name = name.file_name().ok_or("Invalid file name.")?.to_str().ok_or("Invalid file name.")?;
     println!("\nSearch by process name: {}", name);
@@ -76,6 +79,7 @@ fn main() -> Result<(), String> {
 
     println!("\n{:=<125}", "");
     
+    // Get PID by process name
     println!("\nGet PID by process name: {}", name);
     if let Some(pids) = win_proc_list.get_pids_by_name(name) {
         for pid in pids.iter() {
@@ -87,6 +91,7 @@ fn main() -> Result<(), String> {
 
     println!("\n{:=<125}", "");
     
+    // Get process name by PID
     println!("\nGet process name by PID: {}", pid);
     if let Some(name) = win_proc_list.get_name_by_pid(pid) {
         println!("Process name: {}", name);
@@ -96,11 +101,26 @@ fn main() -> Result<(), String> {
 
     println!("\n{:=<125}", "");
     
+    // Get process info by PID
     println!("\nGet process info by PID: {}", pid);
     if let Some(proc) = winprocinfo::get_proc_info_by_pid(pid).map_err(|e| e.to_string())? {
         print_proc_info(&proc);
     } else {
         println!("Process not found.");
+    }
+
+    println!("\n{:=<125}", "");
+    
+    // Search by process name pattern
+    println!("\nGet PID by process name pattern: win*");
+    let procs = win_proc_list.search_by_pattern("win*");
+    if procs.is_empty() {
+        println!("Process not found.");
+    }
+    else {
+        for proc in procs.iter() {
+            print_proc_info(proc);
+        }
     }
     
     Ok(())
