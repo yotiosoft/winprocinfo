@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-![crates.io](https://img.shields.io/badge/crates.io-v0.1.1-brightgreen.svg)
+![crates.io](https://img.shields.io/badge/crates.io-v0.1.2-brightgreen.svg)
 
 ## Overview
 WinProcInfo is a Rust library that utilizes Windows API to obtain information about processes and threads in a Windows system. 
@@ -27,7 +27,7 @@ winprocinfo.exe           61448      51         1          4352143360      43704
 Add the following to your `Cargo.toml` file.
 ```toml
 [dependencies]
-winprocinfo = "0.1.1"
+winprocinfo = "0.1.2"
 ```
 
 Or, you can use ``cargo`` to add the library to your project.

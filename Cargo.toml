@@ -1,6 +1,6 @@
 [package]
 name = "winprocinfo"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["yotio <yotio@yotiosoft.com>"]
 description = "Obtain information about processes and threads in a Windows system using the Windows API."
 license = "MIT OR Apache-2.0"
