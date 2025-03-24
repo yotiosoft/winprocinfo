@@ -417,6 +417,7 @@ impl WinProcList {
     ///     println!("PID: {}", proc.unique_process_id);
     /// }
     /// ```
+#[cfg(feature = "pattern-search")]
     pub fn search_by_pattern(&self, pattern: &str) -> Vec<&ProcInfo> {
         use regex::Regex;
 
