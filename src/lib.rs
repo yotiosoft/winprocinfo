@@ -396,6 +396,8 @@ impl WinProcList {
 
     /// Searches for processes by a pattern in their name.
     /// 
+    /// This function requires the ``pattern-search`` feature to be enabled. (default: enabled)
+    /// 
     /// # Arguments
     /// 
     /// * `pattern` - The pattern to search for in the process names.
