@@ -24,6 +24,8 @@ winprocinfo.exe           61448      51         1          4352143360      43704
 ```
 
 ## Installation
+The repository is available on [crates.io](https://crates.io/crates/winprocinfo).
+
 Add the following to your `Cargo.toml` file.
 ```toml
 [dependencies]
